@@ -40,8 +40,10 @@ export function scoreDanger(
   }
 
   // De-escalate purely cosmetic updates (tags / description / comment only).
+  // Never de-escalate when something forces replacement — that signal must stay loud.
   if (
     action === 'update' &&
+    forced.length === 0 &&
     attrs.length > 0 &&
     attrs.every((a) => /^tags(\.|\[|$)/.test(a.path) || /^(description|comment)$/.test(a.path))
   ) {

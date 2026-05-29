@@ -31,21 +31,21 @@ export function diffAttributes(change: RawChange, action: Action): AttrChange[] 
 
   const out: AttrChange[] = [];
   for (const path of paths) {
-    const isUnknown = isCoveredBy(path, unknown) || unknown.has(path);
+    const isUnknown = isCoveredBy(path, unknown);
     const before: JsonValue | null = beforeLeaves.has(path) ? beforeLeaves.get(path)! : null;
     const after: JsonValue | null = afterLeaves.has(path) ? afterLeaves.get(path)! : null;
 
     const changed = isUnknown || !valuesEqual(before, after);
     if (!changed) continue;
 
-    const isSensitive = isCoveredBy(path, sensitive) || sensitive.has(path);
+    const isSensitive = isCoveredBy(path, sensitive);
     out.push({
       path,
       before: isSensitive ? REDACTED : before,
       after: isSensitive ? REDACTED : isUnknown ? UNKNOWN_AFTER : after,
       sensitive: isSensitive,
       unknown: isUnknown,
-      forcesReplacement: isCoveredBy(path, force) || force.has(path),
+      forcesReplacement: isCoveredBy(path, force),
     });
   }
 

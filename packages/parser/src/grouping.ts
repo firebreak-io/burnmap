@@ -3,6 +3,7 @@ import type {
 } from './types.js';
 import type { RawChange } from './plan-json.js';
 import { mapAction } from './actions.js';
+import { flattenTruePaths } from './paths.js';
 
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const arr = map.get(key);
@@ -51,7 +52,9 @@ export function parseOutputs(outputs: Record<string, RawChange>): OutputChange[]
   for (const [name, change] of Object.entries(outputs)) {
     const action = mapAction(change.actions);
     if (action === 'no-op') continue;
-    const sensitive = change.before_sensitive === true || change.after_sensitive === true;
+    const sensitive =
+      flattenTruePaths(change.before_sensitive ?? false).size > 0 ||
+      flattenTruePaths(change.after_sensitive ?? false).size > 0;
     result.push({ name, action, sensitive });
   }
   result.sort((a, b) => a.name.localeCompare(b.name));

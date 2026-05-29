@@ -17,6 +17,9 @@ export function flattenLeaves(
   out: Map<string, JsonValue> = new Map(),
 ): Map<string, JsonValue> {
   if (value === null || typeof value !== 'object') {
+    // A bare scalar at the top level has no attribute path; skip it rather than
+    // emit a confusing empty-string key. Callers always start from an object.
+    if (prefix === '') return out;
     out.set(prefix, value as JsonValue);
     return out;
   }
