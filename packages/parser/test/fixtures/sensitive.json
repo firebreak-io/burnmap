@@ -1,0 +1,21 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.1",
+  "resource_changes": [
+    {
+      "address": "aws_db_instance.main",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["update"],
+        "before": { "password": "OLD_SECRET_VALUE", "name": "db" },
+        "after": { "password": "NEW_SECRET_VALUE", "name": "db" },
+        "before_sensitive": { "password": true },
+        "after_sensitive": { "password": true }
+      }
+    }
+  ],
+  "output_changes": {}
+}
