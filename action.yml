@@ -9,7 +9,6 @@ inputs:
     required: true
   github-token:
     description: Token used to post the PR comment.
-    required: true
     default: ${{ github.token }}
   aws-region:
     description: AWS region for the S3 client.

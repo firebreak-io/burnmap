@@ -47,11 +47,14 @@ async function main(): Promise<void> {
         prNumber, sha, outPng,
       },
     );
-    core.info(`burnmap ${result.commentAction} comment ${result.commentId} → ${result.imageUrl}`);
+    // The presigned URL is a bearer credential for the image — mask it so it
+    // never appears in (potentially public) Actions logs, including the output.
+    core.setSecret(result.imageUrl);
     core.setOutput('image-url', result.imageUrl);
+    core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
   } finally {
     rmSync(outPng, { force: true }); // remove the intermediate PNG (already uploaded to S3)
   }
 }
 
-main().catch((err: Error) => core.setFailed(err.message));
+main().catch((err: unknown) => core.setFailed(err instanceof Error ? err.message : String(err)));

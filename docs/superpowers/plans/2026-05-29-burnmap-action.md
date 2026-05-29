@@ -730,14 +730,17 @@ async function main(): Promise<void> {
         prNumber, sha, outPng,
       },
     );
-    core.info(`burnmap ${result.commentAction} comment ${result.commentId} → ${result.imageUrl}`);
+    // The presigned URL is a bearer credential for the image — mask it so it
+    // never appears in (potentially public) Actions logs, including the output.
+    core.setSecret(result.imageUrl);
     core.setOutput('image-url', result.imageUrl);
+    core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
   } finally {
     rmSync(outPng, { force: true }); // remove the intermediate PNG (already uploaded to S3)
   }
 }
 
-main().catch((err: Error) => core.setFailed(err.message));
+main().catch((err: unknown) => core.setFailed(err instanceof Error ? err.message : String(err)));
 ```
 
 - [ ] **Step 2: Write `index.ts`**
@@ -765,7 +768,6 @@ inputs:
     required: true
   github-token:
     description: Token used to post the PR comment.
-    required: true
     default: ${{ github.token }}
   aws-region:
     description: AWS region for the S3 client.
@@ -839,6 +841,9 @@ Provisions the infrastructure. **Validated only** — do NOT `tofu apply` (repo 
 
 `packages/action/infra/versions.tf`:
 ```hcl
+# Bootstrap module: local state is intentional. This provisions one bucket + one
+# role, applied once by an operator. Add a `backend "s3"` block here if the infra
+# grows or is applied by more than one person on a shared AWS account.
 terraform {
   required_version = ">= 1.6"
   required_providers {
