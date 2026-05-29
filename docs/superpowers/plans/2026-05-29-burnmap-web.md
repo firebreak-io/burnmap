@@ -273,6 +273,7 @@ body {
 .more { color: var(--muted); font-size: 11.5px; margin-left: 40px; padding-bottom: 6px; }
 
 .outputs { margin-top: 4px; }
+.out-action { margin-left: auto; color: var(--muted); font-size: 11.5px; }
 ```
 
 - [ ] **Step 7: Install dependencies**
@@ -790,7 +791,8 @@ describe('ResourceRow', () => {
     expect(container.querySelector('.item.hot')).not.toBeNull();
     expect(screen.getByText('force replace')).toBeInTheDocument();
     expect(screen.getByText(/forces replacement: engine_version/)).toBeInTheDocument();
-    expect(screen.getByText(/engine_version/)).toBeInTheDocument();
+    // target the attr diff specifically — "14.7" appears only there, not in the reason line
+    expect(screen.getByText(/engine_version "14\.7" → "15\.4"/)).toBeInTheDocument();
     expect(container.querySelector('.attr .forces')).not.toBeNull();
   });
 
@@ -825,10 +827,14 @@ import type { ResourceChange } from '@burnmap/parser';
 import { ACTION_GLYPH, ACTION_KIND } from '../glyphs';
 import { formatAttr, isHighRisk, relativeAddress } from '../model-view';
 
-function anchorId(address: string): string {
+export function anchorId(address: string): string {
   // Preserve underscores (common in resource type names); collapse other
-  // non-alphanumerics to '-'. The DangerIndex links use this same function,
-  // so index anchors always match row ids.
+  // non-alphanumerics to '-'. DangerIndex links use this same function, so
+  // index anchors always match row ids.
+  // Limitation: '.' and '-' both collapse to '-', so two addresses differing
+  // only by '.'/'-' would collide. Real Terraform addresses use '.' purely as a
+  // structural separator and never contain literal hyphens in type/module
+  // segments, so collisions are not expected in practice.
   return `r-${address.replace(/[^a-zA-Z0-9_]+/g, '-')}`;
 }
 
@@ -855,9 +861,7 @@ function Badge({ rc }: { rc: ResourceChange }) {
 
 export function ResourceRow({ rc }: { rc: ResourceChange }) {
   const hot = isHighRisk(rc);
-  const isUpdate = rc.action === 'update';
-  const showFullDetail = hot;
-  const showCompact = isUpdate && !hot && rc.attrs.length > 0;
+  const showCompact = rc.action === 'update' && !hot && rc.attrs.length > 0;
 
   return (
     <div className={`item${hot ? ' hot' : ''}`} id={anchorId(rc.address)}>
@@ -867,10 +871,10 @@ export function ResourceRow({ rc }: { rc: ResourceChange }) {
         <Badge rc={rc} />
       </div>
 
-      {showFullDetail && (
+      {hot && (
         <div className="detail">
-          {rc.dangerReasons.map((reason) => (
-            <p className="reason" key={reason}>{reason}</p>
+          {rc.dangerReasons.map((reason, i) => (
+            <p className="reason" key={i}>{reason}</p>
           ))}
           {rc.attrs.map((a) => {
             const text = formatAttr(a);
@@ -890,8 +894,6 @@ export function ResourceRow({ rc }: { rc: ResourceChange }) {
     </div>
   );
 }
-
-export { anchorId };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -960,6 +962,8 @@ export function DangerIndex({ model }: { model: ChangeModel }) {
       <span className="lbl">⚠ {items.length} high-risk</span>
       {items.map((rc) => (
         <a className="chip" href={`#${anchorId(rc.address)}`} key={rc.address}>
+          {/* only 'replace' and 'delete' reach highRiskList under current scoring;
+              'd' = destroy palette, 'r' = replace palette (covers any non-delete). */}
           <span className={`tag ${rc.action === 'delete' ? 'd' : 'r'}`}>{ACTION_GLYPH[rc.action]}</span>
           {rc.address}
         </a>
@@ -1090,7 +1094,7 @@ export function Outputs({ outputs }: { outputs: OutputChange[] }) {
       {outputs.map((o) => (
         <div className="row" key={o.name}>
           <span className="addr">{o.name}</span>
-          <span className="more" style={{ margin: 0, padding: 0 }}>
+          <span className="out-action">
             {ACTION_LABEL[o.action]}{o.sensitive ? ' · sensitive' : ''}
           </span>
         </div>

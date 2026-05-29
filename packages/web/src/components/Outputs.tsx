@@ -9,7 +9,7 @@ export function Outputs({ outputs }: { outputs: OutputChange[] }) {
       {outputs.map((o) => (
         <div className="row" key={o.name}>
           <span className="addr">{o.name}</span>
-          <span className="more" style={{ margin: 0, padding: 0 }}>
+          <span className="out-action">
             {ACTION_LABEL[o.action]}{o.sensitive ? ' · sensitive' : ''}
           </span>
         </div>

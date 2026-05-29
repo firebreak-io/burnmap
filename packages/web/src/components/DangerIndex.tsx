@@ -11,6 +11,8 @@ export function DangerIndex({ model }: { model: ChangeModel }) {
       <span className="lbl">⚠ {items.length} high-risk</span>
       {items.map((rc) => (
         <a className="chip" href={`#${anchorId(rc.address)}`} key={rc.address}>
+          {/* only 'replace' and 'delete' reach highRiskList under current scoring;
+              'd' = destroy palette, 'r' = replace palette (covers any non-delete). */}
           <span className={`tag ${rc.action === 'delete' ? 'd' : 'r'}`}>{ACTION_GLYPH[rc.action]}</span>
           {rc.address}
         </a>

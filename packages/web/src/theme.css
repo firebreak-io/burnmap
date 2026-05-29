@@ -90,3 +90,4 @@ body {
 .more { color: var(--muted); font-size: 11.5px; margin-left: 40px; padding-bottom: 6px; }
 
 .outputs { margin-top: 4px; }
+.out-action { margin-left: auto; color: var(--muted); font-size: 11.5px; }
