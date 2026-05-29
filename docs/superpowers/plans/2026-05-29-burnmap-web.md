@@ -488,6 +488,7 @@ git commit -m "feat(web): view-model helpers and glyph maps"
 import { describe, it, expect } from 'vitest';
 import { sampleModel } from '../src/sample-data';
 import { highRiskList } from '../src/model-view';
+import type { Action } from '@burnmap/parser';
 
 describe('sampleModel', () => {
   it('is a realistic model with two high-risk changes (matches the design mockup)', () => {
@@ -498,6 +499,15 @@ describe('sampleModel', () => {
     const data = sampleModel.modules.find((m) => m.module === 'module.data');
     expect(data).toBeDefined();
     expect(JSON.stringify(sampleModel)).not.toContain('hunter2'); // no real secrets baked in
+  });
+
+  it('has a summary that reconciles with the actual resources (no phantom counts)', () => {
+    const all = sampleModel.modules.flatMap((m) => m.types.flatMap((t) => t.resources));
+    const counted = (a: Action) => all.filter((r) => r.action === a).length;
+    expect(counted('create')).toBe(sampleModel.summary.create);
+    expect(counted('update')).toBe(sampleModel.summary.update);
+    expect(counted('delete')).toBe(sampleModel.summary.delete);
+    expect(counted('replace')).toBe(sampleModel.summary.replace);
   });
 });
 ```
@@ -559,6 +569,7 @@ export const sampleModel: ChangeModel = {
           resources: [
             { address: 'module.vpc.aws_subnet.public[0]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
             { address: 'module.vpc.aws_subnet.public[1]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
+            { address: 'module.vpc.aws_subnet.public[2]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
           ],
         },
         {

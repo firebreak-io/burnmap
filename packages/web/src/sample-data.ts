@@ -46,6 +46,7 @@ export const sampleModel: ChangeModel = {
           resources: [
             { address: 'module.vpc.aws_subnet.public[0]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
             { address: 'module.vpc.aws_subnet.public[1]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
+            { address: 'module.vpc.aws_subnet.public[2]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
           ],
         },
         {
