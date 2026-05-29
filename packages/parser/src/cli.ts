@@ -17,7 +17,13 @@ function parseArgs(argv: string[]): Flags {
     const arg = argv[i]!;
     switch (arg) {
       case '--repo': flags.repo = argv[++i] ?? ''; break;
-      case '--pr': flags.pr = Number(argv[++i] ?? '0'); break;
+      case '--pr': {
+        const value = argv[++i];
+        // Number(undefined) is NaN; Number('') is 0 — treat a missing value as NaN
+        // so the main() guard reports it rather than silently defaulting to PR 0.
+        flags.pr = value === undefined ? Number.NaN : Number(value);
+        break;
+      }
       case '--sha': flags.sha = argv[++i] ?? ''; break;
       default:
         if (!arg.startsWith('--')) flags.planPath = arg;

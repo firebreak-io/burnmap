@@ -68,6 +68,22 @@ describe('diffAttributes', () => {
     expect(JSON.stringify(attrs)).not.toContain('correct-horse');
   });
 
+  it('redacts ALL attributes when before/after_sensitive is a top-level boolean true', () => {
+    // tofu emits a bare `true` (not an object) when an entire resource/value is sensitive.
+    const change: RawChange = {
+      actions: ['update'],
+      before: { password: 'WHOLE_SECRET', name: 'db' },
+      after: { password: 'NEW_WHOLE_SECRET', name: 'db' },
+      before_sensitive: true,
+      after_sensitive: true,
+    };
+    const attrs = diffAttributes(change, 'update');
+    const json = JSON.stringify(attrs);
+    expect(json).not.toContain('WHOLE_SECRET');
+    expect(json).not.toContain('NEW_WHOLE_SECRET');
+    for (const a of attrs) expect(a.sensitive).toBe(true);
+  });
+
   it('sorts attributes by path', () => {
     const change: RawChange = {
       actions: ['update'],

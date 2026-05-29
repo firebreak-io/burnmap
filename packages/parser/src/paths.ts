@@ -57,8 +57,11 @@ export function flattenTruePaths(
 /** True if `path` equals a marker or descends from one (ancestor coverage). */
 export function isCoveredBy(path: string, markers: Set<string>): boolean {
   if (markers.has(path)) return true;
+  // An empty-string marker comes from a bare top-level `true` (the entire object
+  // is flagged) — it covers every descendant path.
+  if (markers.has('')) return true;
   for (const m of markers) {
-    if (path.startsWith(`${m}.`) || path.startsWith(`${m}[`)) return true;
+    if (m !== '' && (path.startsWith(`${m}.`) || path.startsWith(`${m}[`))) return true;
   }
   return false;
 }

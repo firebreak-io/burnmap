@@ -44,6 +44,14 @@ describe('parsePlan', () => {
     expect(json).toContain('«sensitive»');
   });
 
+  it('never leaks values for whole-resource-sensitive changes (top-level boolean mask)', () => {
+    const model = parsePlan(fixture('whole-sensitive.json'), meta);
+    const json = JSON.stringify(model);
+    expect(json).not.toContain('OLD_WHOLE_SECRET');
+    expect(json).not.toContain('NEW_WHOLE_SECRET');
+    expect(json).toContain('«sensitive»');
+  });
+
   it('handles an empty plan', () => {
     const model = parsePlan(fixture('empty.json'), meta);
     expect(model.modules).toEqual([]);

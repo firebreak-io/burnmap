@@ -47,4 +47,15 @@ describe('cli', () => {
     expect(err?.status).toBe(2);
     expect(err?.stderr?.toString()).toContain('--pr requires a numeric value');
   });
+
+  it('exits with code 2 when --pr has no value (trailing flag)', () => {
+    let err: { status?: number; stderr?: Buffer } | undefined;
+    try {
+      run([fixture, '--pr']);
+    } catch (e) {
+      err = e as { status?: number; stderr?: Buffer };
+    }
+    expect(err?.status).toBe(2);
+    expect(err?.stderr?.toString()).toContain('--pr requires a numeric value');
+  });
 });
