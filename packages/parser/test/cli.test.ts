@@ -26,7 +26,25 @@ describe('cli', () => {
     expect(json).toContain('15.4');
   });
 
-  it('exits non-zero with a message when the plan file is missing', () => {
-    expect(() => run(['/nonexistent/plan.json'])).toThrow();
+  it('exits with code 1 and a "cannot read" message when the plan file is missing', () => {
+    let err: { status?: number; stderr?: Buffer } | undefined;
+    try {
+      run(['/nonexistent/plan.json']);
+    } catch (e) {
+      err = e as { status?: number; stderr?: Buffer };
+    }
+    expect(err?.status).toBe(1);
+    expect(err?.stderr?.toString()).toContain('cannot read plan file');
+  });
+
+  it('exits with code 2 when --pr is not numeric', () => {
+    let err: { status?: number; stderr?: Buffer } | undefined;
+    try {
+      run([fixture, '--pr', 'not-a-number']);
+    } catch (e) {
+      err = e as { status?: number; stderr?: Buffer };
+    }
+    expect(err?.status).toBe(2);
+    expect(err?.stderr?.toString()).toContain('--pr requires a numeric value');
   });
 });

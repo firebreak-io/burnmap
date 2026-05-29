@@ -32,25 +32,36 @@ function main(): void {
     process.stderr.write('usage: burnmap-parse <plan.json> [--repo R] [--pr N] [--sha S]\n');
     process.exit(2);
   }
+  if (Number.isNaN(flags.pr)) {
+    process.stderr.write('error: --pr requires a numeric value\n');
+    process.exit(2);
+  }
 
-  let plan: RawPlan | undefined;
+  let raw: string;
   try {
-    plan = JSON.parse(readFileSync(flags.planPath, 'utf8')) as RawPlan;
+    raw = readFileSync(flags.planPath, 'utf8');
   } catch (err) {
     process.stderr.write(`error: cannot read plan file ${flags.planPath}: ${(err as Error).message}\n`);
     process.exit(1);
   }
 
-  const resolvedPlan = plan!;
+  let plan: RawPlan;
+  try {
+    plan = JSON.parse(raw) as RawPlan;
+  } catch (err) {
+    process.stderr.write(`error: invalid JSON in plan file ${flags.planPath}: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
+
   const meta: ChangeMeta = {
     repo: flags.repo,
     prNumber: flags.pr,
     commitSha: flags.sha,
-    terraformVersion: resolvedPlan.terraform_version ?? 'unknown',
+    terraformVersion: plan.terraform_version ?? 'unknown',
     generatedAt: new Date().toISOString(),
   };
 
-  process.stdout.write(`${JSON.stringify(parsePlan(resolvedPlan, meta), null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(parsePlan(plan, meta), null, 2)}\n`);
 }
 
 main();

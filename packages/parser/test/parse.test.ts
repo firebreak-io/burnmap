@@ -55,4 +55,10 @@ describe('parsePlan', () => {
     const model = parsePlan(fixture('empty.json'), meta);
     expect(model.meta).toEqual(meta);
   });
+
+  it('overrides meta.terraformVersion with the plan version when they differ', () => {
+    // empty.json declares terraform_version "1.12.1"; the plan file is authoritative.
+    const model = parsePlan(fixture('empty.json'), { ...meta, terraformVersion: '1.0.0' });
+    expect(model.meta.terraformVersion).toBe('1.12.1');
+  });
 });
