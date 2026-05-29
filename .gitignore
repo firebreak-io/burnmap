@@ -1,0 +1,7 @@
+.superpowers/
+node_modules/
+dist/
+*.tfplan
+tfplan
+plan.json
+.DS_Store
