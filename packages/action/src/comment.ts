@@ -1,4 +1,4 @@
-import type { ChangeModel, ResourceChange } from '@burnmap/parser';
+import type { ChangeModel } from '@burnmap/parser';
 
 const GLYPH: Record<string, string> = {
   create: '+', update: '~', replace: '±', delete: '×', 'no-op': '·', read: '?',

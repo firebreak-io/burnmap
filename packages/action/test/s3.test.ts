@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockClient } from 'aws-sdk-client-mock';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Key, uploadAndPresign } from '../src/s3.js';
 
 // Mock the presigner to a deterministic URL.
@@ -34,5 +35,11 @@ describe('uploadAndPresign', () => {
       Key: 'burnmap/x/y/1/s.png',
       ContentType: 'image/png',
     });
+    // the presigned GET must target the same bucket/key with the requested TTL
+    expect(getSignedUrl).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ input: { Bucket: 'burnmap-shots', Key: 'burnmap/x/y/1/s.png' } }),
+      { expiresIn: 3600 },
+    );
   });
 });

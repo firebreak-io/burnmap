@@ -204,7 +204,7 @@ Expected: FAIL — cannot resolve `../src/comment.js`.
 
 `packages/action/src/comment.ts`:
 ```ts
-import type { ChangeModel, ResourceChange } from '@burnmap/parser';
+import type { ChangeModel } from '@burnmap/parser';
 
 const GLYPH: Record<string, string> = {
   create: '+', update: '~', replace: '±', delete: '×', 'no-op': '·', read: '?',
@@ -288,6 +288,7 @@ git commit -m "feat(action): sticky comment marker + body builder"
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockClient } from 'aws-sdk-client-mock';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Key, uploadAndPresign } from '../src/s3.js';
 
 // Mock the presigner to a deterministic URL.
@@ -321,6 +322,12 @@ describe('uploadAndPresign', () => {
       Key: 'burnmap/x/y/1/s.png',
       ContentType: 'image/png',
     });
+    // the presigned GET must target the same bucket/key with the requested TTL
+    expect(getSignedUrl).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ input: { Bucket: 'burnmap-shots', Key: 'burnmap/x/y/1/s.png' } }),
+      { expiresIn: 3600 },
+    );
   });
 });
 ```
@@ -432,6 +439,13 @@ describe('upsertStickyComment', () => {
     expect(octokit.rest.issues.updateComment).toHaveBeenCalledOnce();
     expect(octokit.rest.issues.createComment).not.toHaveBeenCalled();
   });
+
+  it('skips comments with a null body (GitHub returns body:null for empty comments) and creates', async () => {
+    const octokit = fakeOctokit([{ id: 2, body: null as unknown as string }]);
+    const res = await upsertStickyComment({ octokit: octokit as never, ...base, body: '<!-- burnmap:pr-142 -->\nhi' });
+    expect(res.action).toBe('created');
+    expect(octokit.rest.issues.createComment).toHaveBeenCalledOnce();
+  });
 });
 ```
 
@@ -523,7 +537,6 @@ const inputs = {
   planJsonPath: '/p/plan.json',
   webDist: '/web/dist',
   bucket: 'burnmap-shots',
-  region: 'us-east-1',
   ttlSeconds: 3600,
   repo: 'firebreak-io/infra',
   owner: 'firebreak-io',
@@ -589,13 +602,14 @@ export interface RunInputs {
   planJsonPath: string;
   webDist: string;
   bucket: string;
-  region: string;
   ttlSeconds: number;
   repo: string;       // "owner/repo"
   owner: string;
   repoName: string;
   prNumber: number;
   sha: string;
+  /** Where capture writes the PNG. Caller-owned: the caller (main.ts) chose this
+   *  path and is responsible for removing it; run() treats it as an output. */
   outPng: string;
 }
 
@@ -667,7 +681,7 @@ The thin runtime wrapper. Not unit-tested (it only wires Action inputs to real c
 
 `packages/action/src/main.ts`:
 ```ts
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as core from '@actions/core';
@@ -698,25 +712,29 @@ async function main(): Promise<void> {
   const s3 = new S3Client({ region });
   const octokit = getOctokit(token);
 
-  const result = await run(
-    {
-      readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
-      writeShotHtml,
-      cleanupShotHtml,
-      capture: (o) => capture(o),
-      readPng: (p) => readFileSync(p),
-      uploadAndPresign: (o) => uploadAndPresign({ client: s3, ...o }),
-      upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
-    },
-    {
-      planJsonPath, webDist, bucket, region, ttlSeconds,
-      repo: `${owner}/${repo}`, owner, repoName: repo,
-      prNumber, sha, outPng: path.join(tmpdir(), `burnmap-${sha}.png`),
-    },
-  );
-
-  core.info(`burnmap ${result.commentAction} comment ${result.commentId} → ${result.imageUrl}`);
-  core.setOutput('image-url', result.imageUrl);
+  const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
+  try {
+    const result = await run(
+      {
+        readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
+        writeShotHtml,
+        cleanupShotHtml,
+        capture: (o) => capture(o),
+        readPng: (p) => readFileSync(p),
+        uploadAndPresign: (o) => uploadAndPresign({ client: s3, ...o }),
+        upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
+      },
+      {
+        planJsonPath, webDist, bucket, ttlSeconds,
+        repo: `${owner}/${repo}`, owner, repoName: repo,
+        prNumber, sha, outPng,
+      },
+    );
+    core.info(`burnmap ${result.commentAction} comment ${result.commentId} → ${result.imageUrl}`);
+    core.setOutput('image-url', result.imageUrl);
+  } finally {
+    rmSync(outPng, { force: true }); // remove the intermediate PNG (already uploaded to S3)
+  }
 }
 
 main().catch((err: Error) => core.setFailed(err.message));

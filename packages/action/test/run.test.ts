@@ -17,7 +17,6 @@ const inputs = {
   planJsonPath: '/p/plan.json',
   webDist: '/web/dist',
   bucket: 'burnmap-shots',
-  region: 'us-east-1',
   ttlSeconds: 3600,
   repo: 'firebreak-io/infra',
   owner: 'firebreak-io',

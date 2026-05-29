@@ -22,13 +22,14 @@ export interface RunInputs {
   planJsonPath: string;
   webDist: string;
   bucket: string;
-  region: string;
   ttlSeconds: number;
   repo: string;       // "owner/repo"
   owner: string;
   repoName: string;
   prNumber: number;
   sha: string;
+  /** Where capture writes the PNG. Caller-owned: the caller (main.ts) chose this
+   *  path and is responsible for removing it; run() treats it as an output. */
   outPng: string;
 }
 

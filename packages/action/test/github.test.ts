@@ -33,4 +33,11 @@ describe('upsertStickyComment', () => {
     expect(octokit.rest.issues.updateComment).toHaveBeenCalledOnce();
     expect(octokit.rest.issues.createComment).not.toHaveBeenCalled();
   });
+
+  it('skips comments with a null body (GitHub returns body:null for empty comments) and creates', async () => {
+    const octokit = fakeOctokit([{ id: 2, body: null as unknown as string }]);
+    const res = await upsertStickyComment({ octokit: octokit as never, ...base, body: '<!-- burnmap:pr-142 -->\nhi' });
+    expect(res.action).toBe('created');
+    expect(octokit.rest.issues.createComment).toHaveBeenCalledOnce();
+  });
 });
