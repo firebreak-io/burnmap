@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress,
+  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress, MAX_VALUE_LEN,
 } from '../src/model-view';
 import type { ChangeModel, ResourceChange, AttrChange } from '@burnmap/parser';
 
@@ -39,6 +39,17 @@ describe('formatValue', () => {
     expect(formatValue(200)).toBe('200');
     expect(formatValue(null)).toBe('null');
     expect(formatValue(true)).toBe('true');
+  });
+
+  it('escapes embedded quotes and newlines so display strings stay well-formed', () => {
+    expect(formatValue('a"b')).toBe('"a\\"b"');
+    expect(formatValue('line1\nline2')).toBe('"line1\\nline2"');
+  });
+
+  it('truncates very long values with an ellipsis', () => {
+    const out = formatValue('x'.repeat(500));
+    expect(out.length).toBe(MAX_VALUE_LEN + 1); // 120 chars + '…'
+    expect(out.endsWith('…')).toBe(true);
   });
 });
 

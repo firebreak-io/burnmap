@@ -257,7 +257,7 @@ body {
 .badge.force { background: var(--replace-bg); color: var(--replace); border: 1px solid var(--replace); }
 .badge.del { background: var(--destroy-bg); color: var(--destroy); border: 1px solid var(--destroy); }
 
-.item { margin-bottom: 6px; }
+.item { margin-bottom: 6px; border-left: 3px solid transparent; }
 .item.hot {
   border-left: 3px solid var(--destroy); border-radius: 8px;
   background: linear-gradient(90deg, var(--destroy-bg), transparent 60%);
@@ -323,7 +323,7 @@ describe('glyph maps', () => {
 ```ts
 import { describe, it, expect } from 'vitest';
 import {
-  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress,
+  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress, MAX_VALUE_LEN,
 } from '../src/model-view';
 import type { ChangeModel, ResourceChange, AttrChange } from '@burnmap/parser';
 
@@ -362,6 +362,17 @@ describe('formatValue', () => {
     expect(formatValue(200)).toBe('200');
     expect(formatValue(null)).toBe('null');
     expect(formatValue(true)).toBe('true');
+  });
+
+  it('escapes embedded quotes and newlines so display strings stay well-formed', () => {
+    expect(formatValue('a"b')).toBe('"a\\"b"');
+    expect(formatValue('line1\nline2')).toBe('"line1\\nline2"');
+  });
+
+  it('truncates very long values with an ellipsis', () => {
+    const out = formatValue('x'.repeat(500));
+    expect(out.length).toBe(MAX_VALUE_LEN + 1); // 120 chars + '…'
+    expect(out.endsWith('…')).toBe(true);
   });
 });
 
@@ -411,7 +422,11 @@ export const ACTION_LABEL: Record<Action, string> = {
   create: 'create', update: 'change', replace: 'replace', delete: 'destroy', 'no-op': 'no-op', read: 'read',
 };
 
-/** CSS color token: maps an action to one of create|update|replace|destroy. */
+/**
+ * CSS color token: maps an action to one of create|update|replace|destroy.
+ * `no-op`/`read` are filtered out of the manifest by the parser, so they never
+ * reach the palette in practice; they fall back to the neutral `update` token.
+ */
 export const ACTION_KIND: Record<Action, string> = {
   create: 'create', update: 'update', replace: 'replace', delete: 'destroy', 'no-op': 'update', read: 'update',
 };
@@ -436,9 +451,18 @@ export function highRiskList(model: ChangeModel): ResourceChange[] {
     .sort((a, b) => b.dangerScore - a.dangerScore || a.address.localeCompare(b.address));
 }
 
-/** Quote strings; JSON-encode everything else. */
+/** Longest attribute value we display inline before truncating, to protect row layout. */
+export const MAX_VALUE_LEN = 120;
+
+/**
+ * Render a JSON value for display. `JSON.stringify` gives correctly-quoted,
+ * fully-escaped output for strings (handling embedded quotes/newlines/tabs) and
+ * the natural form for numbers/booleans/null/objects. Long values are truncated
+ * so a giant blob (e.g. an inline IAM policy) can't blow out the row.
+ */
 export function formatValue(value: unknown): string {
-  return typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
+  const s = JSON.stringify(value) ?? String(value);
+  return s.length > MAX_VALUE_LEN ? `${s.slice(0, MAX_VALUE_LEN)}…` : s;
 }
 
 /** "path before → after", with markers (sensitive / known-after-apply) shown unquoted. */
@@ -452,7 +476,12 @@ export function formatAttr(attr: AttrChange): string {
   return `${attr.path} ${before} → ${after}`;
 }
 
-/** Drop the "module.x." prefix so a row shows type.name within its group. */
+/**
+ * Drop the "module.x." prefix so a row shows type.name within its group.
+ * Invariant: for non-root resources the parser's `address` starts with
+ * `${module}.`. If a future address format diverges, this falls back to the
+ * full address (the row would then show a redundant module prefix).
+ */
 export function relativeAddress(rc: ResourceChange): string {
   if (rc.module && rc.address.startsWith(`${rc.module}.`)) {
     return rc.address.slice(rc.module.length + 1);

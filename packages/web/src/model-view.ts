@@ -15,9 +15,18 @@ export function highRiskList(model: ChangeModel): ResourceChange[] {
     .sort((a, b) => b.dangerScore - a.dangerScore || a.address.localeCompare(b.address));
 }
 
-/** Quote strings; JSON-encode everything else. */
+/** Longest attribute value we display inline before truncating, to protect row layout. */
+export const MAX_VALUE_LEN = 120;
+
+/**
+ * Render a JSON value for display. `JSON.stringify` gives correctly-quoted,
+ * fully-escaped output for strings (handling embedded quotes/newlines/tabs) and
+ * the natural form for numbers/booleans/null/objects. Long values are truncated
+ * so a giant blob (e.g. an inline IAM policy) can't blow out the row.
+ */
 export function formatValue(value: unknown): string {
-  return typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
+  const s = JSON.stringify(value) ?? String(value);
+  return s.length > MAX_VALUE_LEN ? `${s.slice(0, MAX_VALUE_LEN)}…` : s;
 }
 
 /** "path before → after", with markers (sensitive / known-after-apply) shown unquoted. */
@@ -31,7 +40,12 @@ export function formatAttr(attr: AttrChange): string {
   return `${attr.path} ${before} → ${after}`;
 }
 
-/** Drop the "module.x." prefix so a row shows type.name within its group. */
+/**
+ * Drop the "module.x." prefix so a row shows type.name within its group.
+ * Invariant: for non-root resources the parser's `address` starts with
+ * `${module}.`. If a future address format diverges, this falls back to the
+ * full address (the row would then show a redundant module prefix).
+ */
 export function relativeAddress(rc: ResourceChange): string {
   if (rc.module && rc.address.startsWith(`${rc.module}.`)) {
     return rc.address.slice(rc.module.length + 1);

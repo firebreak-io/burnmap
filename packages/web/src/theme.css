@@ -74,7 +74,7 @@ body {
 .badge.force { background: var(--replace-bg); color: var(--replace); border: 1px solid var(--replace); }
 .badge.del { background: var(--destroy-bg); color: var(--destroy); border: 1px solid var(--destroy); }
 
-.item { margin-bottom: 6px; }
+.item { margin-bottom: 6px; border-left: 3px solid transparent; }
 .item.hot {
   border-left: 3px solid var(--destroy); border-radius: 8px;
   background: linear-gradient(90deg, var(--destroy-bg), transparent 60%);
