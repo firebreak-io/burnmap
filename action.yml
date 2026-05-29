@@ -1,0 +1,30 @@
+name: burnmap
+description: Render a tofu/terraform plan as a diagram and post it as a sticky PR comment.
+inputs:
+  plan-json:
+    description: Path to `tofu show -json <plan>` output.
+    required: true
+  s3-bucket:
+    description: S3 bucket for the rendered PNG (private).
+    required: true
+  github-token:
+    description: Token used to post the PR comment.
+    required: true
+    default: ${{ github.token }}
+  aws-region:
+    description: AWS region for the S3 client.
+    required: false
+    default: us-east-1
+  url-ttl-seconds:
+    description: Presigned URL TTL (seconds). GitHub's Camo proxy caches the image at render time.
+    required: false
+    default: "86400"
+  web-dist:
+    description: Override path to the built @burnmap/web dist (defaults to the bundled one).
+    required: false
+outputs:
+  image-url:
+    description: Presigned URL of the uploaded diagram.
+runs:
+  using: docker
+  image: Dockerfile
