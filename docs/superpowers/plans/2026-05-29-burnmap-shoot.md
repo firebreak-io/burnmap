@@ -461,7 +461,14 @@ export function resolveWebDist(): string {
 
 /** Write the injected HTML into the dist dir; returns its absolute path. */
 export function writeShotHtml(webDist: string, model: unknown): string {
-  const builtHtml = readFileSync(path.join(webDist, 'index.html'), 'utf8');
+  let builtHtml: string;
+  try {
+    builtHtml = readFileSync(path.join(webDist, 'index.html'), 'utf8');
+  } catch {
+    throw new Error(
+      `writeShotHtml: @burnmap/web build not found at ${webDist} — run "npm run build -w @burnmap/web" first`,
+    );
+  }
   const outPath = path.join(webDist, SHOT_HTML_NAME);
   writeFileSync(outPath, buildShotHtml(builtHtml, model), 'utf8');
   return outPath;
