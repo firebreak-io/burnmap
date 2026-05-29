@@ -597,7 +597,14 @@ export async function capture(opts: CaptureOptions): Promise<string> {
     shotHtmlPath, outPath, width = 760, readyTimeoutMs = 15000, selector = '.card',
   } = opts;
 
-  const browser = await chromium.launch();
+  // Vite emits `<script type="module" crossorigin>` + `<link crossorigin>`. Under
+  // file:// the page origin is `null`, and ES modules are always fetched with CORS,
+  // so chromium blocks the bundle/CSS. These flags allow the headless browser to
+  // load our own locally-generated, self-contained diagram over file://. Safe here:
+  // the content is trusted (we generated it) and no network requests are made.
+  const browser = await chromium.launch({
+    args: ['--allow-file-access-from-files', '--disable-web-security'],
+  });
   try {
     const page = await browser.newPage({
       viewport: { width, height: 800 },
@@ -610,9 +617,10 @@ export async function capture(opts: CaptureOptions): Promise<string> {
         undefined,
         { timeout: readyTimeoutMs },
       );
-    } catch {
+    } catch (err) {
       throw new Error(
         `capture: page never signalled __BURNMAP_READY__ within ${readyTimeoutMs}ms (${shotHtmlPath})`,
+        { cause: err },
       );
     }
     await page.locator(selector).first().screenshot({ path: outPath });
@@ -818,6 +826,7 @@ git commit -m "feat(shoot): burnmap-shoot CLI (plan json → png) reusing parseP
 - **Type consistency:** `capture(CaptureOptions)`, `writeShotHtml(webDist, model)`, `buildShotHtml(builtHtml, model)`, `resolveWebDist()`, `cleanupShotHtml(webDist)` signatures are consistent across Tasks 4–7. CLI reuses `parsePlan`, `RawPlan`, `ChangeMeta` from `@burnmap/parser` (real exports verified in Phase 1).
 - **Out of this phase:** S3 upload + presign and the GitHub sticky comment are Phase 4 (`@burnmap/action`). `capture` returns a local PNG path; Phase 4 consumes it.
 - **Browser dependency:** Tasks 6–7 require `npx playwright install chromium` (Task 3 Step 4). These tests are slower; the vitest config raises timeouts to 30s.
+- **Chromium flags (`--allow-file-access-from-files --disable-web-security`):** required because Vite emits `crossorigin` on the module script/CSS and `file://` is a `null` origin (ES modules always use CORS). Safe here — trusted local content, no network. **Phase 4 hardening note:** if the Docker action ever runs in a shared/multi-tenant environment, prefer a narrower approach — a `BrowserContext` with `bypassCSP: true`, or serve `dist/` from a localhost static server (with correct JS/CSS MIME types) and load over `http://127.0.0.1` instead of `file://`.
 
 ---
 

@@ -40,9 +40,10 @@ export async function capture(opts: CaptureOptions): Promise<string> {
         undefined,
         { timeout: readyTimeoutMs },
       );
-    } catch {
+    } catch (err) {
       throw new Error(
         `capture: page never signalled __BURNMAP_READY__ within ${readyTimeoutMs}ms (${shotHtmlPath})`,
+        { cause: err },
       );
     }
     await page.locator(selector).first().screenshot({ path: outPath });
