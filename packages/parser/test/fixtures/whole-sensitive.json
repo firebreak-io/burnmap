@@ -1,0 +1,21 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.1",
+  "resource_changes": [
+    {
+      "address": "aws_secretsmanager_secret_version.db",
+      "mode": "managed",
+      "type": "aws_secretsmanager_secret_version",
+      "name": "db",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["update"],
+        "before": { "secret_string": "OLD_WHOLE_SECRET" },
+        "after": { "secret_string": "NEW_WHOLE_SECRET" },
+        "before_sensitive": true,
+        "after_sensitive": true
+      }
+    }
+  ],
+  "output_changes": {}
+}

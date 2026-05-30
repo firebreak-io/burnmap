@@ -1,0 +1,27 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.1",
+  "resource_changes": [
+    {
+      "address": "module.vpc.aws_subnet.public[0]",
+      "module_address": "module.vpc",
+      "mode": "managed",
+      "type": "aws_subnet",
+      "name": "public",
+      "index": 0,
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": { "actions": ["create"], "before": null, "after": { "cidr_block": "10.0.1.0/24" } }
+    },
+    {
+      "address": "aws_s3_bucket.unchanged",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "unchanged",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": { "actions": ["no-op"], "before": { "bucket": "x" }, "after": { "bucket": "x" } }
+    }
+  ],
+  "output_changes": {
+    "subnet_id": { "actions": ["create"], "before": null, "after": null, "after_unknown": true }
+  }
+}
