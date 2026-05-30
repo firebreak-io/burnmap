@@ -40,4 +40,19 @@ describe('upsertStickyComment', () => {
     expect(res.action).toBe('created');
     expect(octokit.rest.issues.createComment).toHaveBeenCalledOnce();
   });
+
+  it('only matches a comment whose FIRST line is the marker (not one that merely quotes it)', async () => {
+    const octokit = fakeOctokit([{ id: 9, body: 'see this: <!-- burnmap:pr-142 -->' }]);
+    const res = await upsertStickyComment({ octokit: octokit as never, ...base, body: '<!-- burnmap:pr-142 -->\nhi' });
+    expect(res.action).toBe('created');
+    expect(octokit.rest.issues.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('falls back to creating when updateComment fails (e.g. 403 on a comment we do not own)', async () => {
+    const octokit = fakeOctokit([{ id: 88, body: '<!-- burnmap:pr-142 -->\ntheirs' }]);
+    octokit.rest.issues.updateComment = vi.fn(async () => { throw new Error('403'); });
+    const res = await upsertStickyComment({ octokit: octokit as never, ...base, body: '<!-- burnmap:pr-142 -->\nmine' });
+    expect(res.action).toBe('created');
+    expect(octokit.rest.issues.createComment).toHaveBeenCalledOnce();
+  });
 });
