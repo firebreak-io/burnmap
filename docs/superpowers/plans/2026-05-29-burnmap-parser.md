@@ -1077,12 +1077,12 @@ Ties everything together and is verified against realistic plan fixtures.
       }
     },
     {
-      "address": "aws_s3_bucket.legacy_logs",
+      "address": "aws_security_group_rule.legacy_ingress",
       "mode": "managed",
-      "type": "aws_s3_bucket",
-      "name": "legacy_logs",
+      "type": "aws_security_group_rule",
+      "name": "legacy_ingress",
       "provider_name": "registry.terraform.io/hashicorp/aws",
-      "change": { "actions": ["delete"], "before": { "bucket": "legacy" }, "after": null }
+      "change": { "actions": ["delete"], "before": { "from_port": 22 }, "after": null }
     }
   ],
   "output_changes": {}
