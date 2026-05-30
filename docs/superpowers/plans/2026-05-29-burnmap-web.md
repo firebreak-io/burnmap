@@ -257,7 +257,7 @@ body {
 .badge.force { background: var(--replace-bg); color: var(--replace); border: 1px solid var(--replace); }
 .badge.del { background: var(--destroy-bg); color: var(--destroy); border: 1px solid var(--destroy); }
 
-.item { margin-bottom: 6px; }
+.item { margin-bottom: 6px; border-left: 3px solid transparent; }
 .item.hot {
   border-left: 3px solid var(--destroy); border-radius: 8px;
   background: linear-gradient(90deg, var(--destroy-bg), transparent 60%);
@@ -273,6 +273,7 @@ body {
 .more { color: var(--muted); font-size: 11.5px; margin-left: 40px; padding-bottom: 6px; }
 
 .outputs { margin-top: 4px; }
+.out-action { margin-left: auto; color: var(--muted); font-size: 11.5px; }
 ```
 
 - [ ] **Step 7: Install dependencies**
@@ -323,7 +324,7 @@ describe('glyph maps', () => {
 ```ts
 import { describe, it, expect } from 'vitest';
 import {
-  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress,
+  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress, MAX_VALUE_LEN,
 } from '../src/model-view';
 import type { ChangeModel, ResourceChange, AttrChange } from '@burnmap/parser';
 
@@ -362,6 +363,17 @@ describe('formatValue', () => {
     expect(formatValue(200)).toBe('200');
     expect(formatValue(null)).toBe('null');
     expect(formatValue(true)).toBe('true');
+  });
+
+  it('escapes embedded quotes and newlines so display strings stay well-formed', () => {
+    expect(formatValue('a"b')).toBe('"a\\"b"');
+    expect(formatValue('line1\nline2')).toBe('"line1\\nline2"');
+  });
+
+  it('truncates very long values with an ellipsis', () => {
+    const out = formatValue('x'.repeat(500));
+    expect(out.length).toBe(MAX_VALUE_LEN + 1); // 120 chars + '…'
+    expect(out.endsWith('…')).toBe(true);
   });
 });
 
@@ -411,7 +423,11 @@ export const ACTION_LABEL: Record<Action, string> = {
   create: 'create', update: 'change', replace: 'replace', delete: 'destroy', 'no-op': 'no-op', read: 'read',
 };
 
-/** CSS color token: maps an action to one of create|update|replace|destroy. */
+/**
+ * CSS color token: maps an action to one of create|update|replace|destroy.
+ * `no-op`/`read` are filtered out of the manifest by the parser, so they never
+ * reach the palette in practice; they fall back to the neutral `update` token.
+ */
 export const ACTION_KIND: Record<Action, string> = {
   create: 'create', update: 'update', replace: 'replace', delete: 'destroy', 'no-op': 'update', read: 'update',
 };
@@ -436,9 +452,18 @@ export function highRiskList(model: ChangeModel): ResourceChange[] {
     .sort((a, b) => b.dangerScore - a.dangerScore || a.address.localeCompare(b.address));
 }
 
-/** Quote strings; JSON-encode everything else. */
+/** Longest attribute value we display inline before truncating, to protect row layout. */
+export const MAX_VALUE_LEN = 120;
+
+/**
+ * Render a JSON value for display. `JSON.stringify` gives correctly-quoted,
+ * fully-escaped output for strings (handling embedded quotes/newlines/tabs) and
+ * the natural form for numbers/booleans/null/objects. Long values are truncated
+ * so a giant blob (e.g. an inline IAM policy) can't blow out the row.
+ */
 export function formatValue(value: unknown): string {
-  return typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
+  const s = JSON.stringify(value) ?? String(value);
+  return s.length > MAX_VALUE_LEN ? `${s.slice(0, MAX_VALUE_LEN)}…` : s;
 }
 
 /** "path before → after", with markers (sensitive / known-after-apply) shown unquoted. */
@@ -452,7 +477,12 @@ export function formatAttr(attr: AttrChange): string {
   return `${attr.path} ${before} → ${after}`;
 }
 
-/** Drop the "module.x." prefix so a row shows type.name within its group. */
+/**
+ * Drop the "module.x." prefix so a row shows type.name within its group.
+ * Invariant: for non-root resources the parser's `address` starts with
+ * `${module}.`. If a future address format diverges, this falls back to the
+ * full address (the row would then show a redundant module prefix).
+ */
 export function relativeAddress(rc: ResourceChange): string {
   if (rc.module && rc.address.startsWith(`${rc.module}.`)) {
     return rc.address.slice(rc.module.length + 1);
@@ -488,6 +518,7 @@ git commit -m "feat(web): view-model helpers and glyph maps"
 import { describe, it, expect } from 'vitest';
 import { sampleModel } from '../src/sample-data';
 import { highRiskList } from '../src/model-view';
+import type { Action } from '@burnmap/parser';
 
 describe('sampleModel', () => {
   it('is a realistic model with two high-risk changes (matches the design mockup)', () => {
@@ -498,6 +529,15 @@ describe('sampleModel', () => {
     const data = sampleModel.modules.find((m) => m.module === 'module.data');
     expect(data).toBeDefined();
     expect(JSON.stringify(sampleModel)).not.toContain('hunter2'); // no real secrets baked in
+  });
+
+  it('has a summary that reconciles with the actual resources (no phantom counts)', () => {
+    const all = sampleModel.modules.flatMap((m) => m.types.flatMap((t) => t.resources));
+    const counted = (a: Action) => all.filter((r) => r.action === a).length;
+    expect(counted('create')).toBe(sampleModel.summary.create);
+    expect(counted('update')).toBe(sampleModel.summary.update);
+    expect(counted('delete')).toBe(sampleModel.summary.delete);
+    expect(counted('replace')).toBe(sampleModel.summary.replace);
   });
 });
 ```
@@ -559,6 +599,7 @@ export const sampleModel: ChangeModel = {
           resources: [
             { address: 'module.vpc.aws_subnet.public[0]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
             { address: 'module.vpc.aws_subnet.public[1]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
+            { address: 'module.vpc.aws_subnet.public[2]', module: 'module.vpc', type: 'aws_subnet', name: 'public', provider: 'aws', action: 'create', attrs: [], dangerScore: 10, dangerReasons: [] },
           ],
         },
         {
@@ -750,7 +791,8 @@ describe('ResourceRow', () => {
     expect(container.querySelector('.item.hot')).not.toBeNull();
     expect(screen.getByText('force replace')).toBeInTheDocument();
     expect(screen.getByText(/forces replacement: engine_version/)).toBeInTheDocument();
-    expect(screen.getByText(/engine_version/)).toBeInTheDocument();
+    // target the attr diff specifically — "14.7" appears only there, not in the reason line
+    expect(screen.getByText(/engine_version "14\.7" → "15\.4"/)).toBeInTheDocument();
     expect(container.querySelector('.attr .forces')).not.toBeNull();
   });
 
@@ -785,10 +827,14 @@ import type { ResourceChange } from '@burnmap/parser';
 import { ACTION_GLYPH, ACTION_KIND } from '../glyphs';
 import { formatAttr, isHighRisk, relativeAddress } from '../model-view';
 
-function anchorId(address: string): string {
+export function anchorId(address: string): string {
   // Preserve underscores (common in resource type names); collapse other
-  // non-alphanumerics to '-'. The DangerIndex links use this same function,
-  // so index anchors always match row ids.
+  // non-alphanumerics to '-'. DangerIndex links use this same function, so
+  // index anchors always match row ids.
+  // Limitation: '.' and '-' both collapse to '-', so two addresses differing
+  // only by '.'/'-' would collide. Real Terraform addresses use '.' purely as a
+  // structural separator and never contain literal hyphens in type/module
+  // segments, so collisions are not expected in practice.
   return `r-${address.replace(/[^a-zA-Z0-9_]+/g, '-')}`;
 }
 
@@ -815,9 +861,7 @@ function Badge({ rc }: { rc: ResourceChange }) {
 
 export function ResourceRow({ rc }: { rc: ResourceChange }) {
   const hot = isHighRisk(rc);
-  const isUpdate = rc.action === 'update';
-  const showFullDetail = hot;
-  const showCompact = isUpdate && !hot && rc.attrs.length > 0;
+  const showCompact = rc.action === 'update' && !hot && rc.attrs.length > 0;
 
   return (
     <div className={`item${hot ? ' hot' : ''}`} id={anchorId(rc.address)}>
@@ -827,10 +871,10 @@ export function ResourceRow({ rc }: { rc: ResourceChange }) {
         <Badge rc={rc} />
       </div>
 
-      {showFullDetail && (
+      {hot && (
         <div className="detail">
-          {rc.dangerReasons.map((reason) => (
-            <p className="reason" key={reason}>{reason}</p>
+          {rc.dangerReasons.map((reason, i) => (
+            <p className="reason" key={i}>{reason}</p>
           ))}
           {rc.attrs.map((a) => {
             const text = formatAttr(a);
@@ -850,8 +894,6 @@ export function ResourceRow({ rc }: { rc: ResourceChange }) {
     </div>
   );
 }
-
-export { anchorId };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -920,6 +962,8 @@ export function DangerIndex({ model }: { model: ChangeModel }) {
       <span className="lbl">⚠ {items.length} high-risk</span>
       {items.map((rc) => (
         <a className="chip" href={`#${anchorId(rc.address)}`} key={rc.address}>
+          {/* only 'replace' and 'delete' reach highRiskList under current scoring;
+              'd' = destroy palette, 'r' = replace palette (covers any non-delete). */}
           <span className={`tag ${rc.action === 'delete' ? 'd' : 'r'}`}>{ACTION_GLYPH[rc.action]}</span>
           {rc.address}
         </a>
@@ -1050,7 +1094,7 @@ export function Outputs({ outputs }: { outputs: OutputChange[] }) {
       {outputs.map((o) => (
         <div className="row" key={o.name}>
           <span className="addr">{o.name}</span>
-          <span className="more" style={{ margin: 0, padding: 0 }}>
+          <span className="out-action">
             {ACTION_LABEL[o.action]}{o.sensitive ? ' · sensitive' : ''}
           </span>
         </div>
@@ -1275,6 +1319,7 @@ git commit -m "feat(web): entry point, model injection, and screenshot-ready sig
 - **Type consistency:** components are typed against the real `@burnmap/parser` exports (`ChangeModel`, `ChangeSummary`, `ModuleGroup`, `OutputChange`, `ResourceChange`, `Action`). `anchorId` is defined once in `ResourceRow` and imported by `DangerIndex` so index links and row ids always match.
 - **Out of this phase (by design):** Playwright screenshotting + S3 + the PR comment are Phase 3/4. The text-summary line and `<details>` plaintext fallback in the PR comment belong to the action phase, not the SPA.
 - **Note for Phase 3:** drive the *built* SPA, inject `window.__BURNMAP_DATA__` before the bundle loads, and poll `window.__BURNMAP_READY__` before screenshotting. The `drift` field is rendered by reusing `ResourceRow`; if drift display is wanted in the view, add a `<DriftSection>` in a follow-up (the data is already in the model).
+- **Phase 3 robustness requirement (from Phase 2 final review):** `readModel` casts the injected `__BURNMAP_DATA__` to `ChangeModel` without validation, and `main.tsx` schedules `markReady` after render. If a malformed model is ever injected, React render throws and `__BURNMAP_READY__` never fires — the screenshot harness would hang on its poll. Phase 3 must guarantee READY always fires: wrap the render in an error boundary (render a visible error state + still call `markReady`) and/or validate the injected shape before mounting, and give the harness a bounded timeout on the READY poll so a render failure produces a clear error screenshot rather than a hang.
 
 ---
 
