@@ -30,7 +30,10 @@ resource "aws_iam_role" "uploader" {
 
 data "aws_iam_policy_document" "put_shots" {
   statement {
-    actions   = ["s3:PutObject"]
+    # PutObject to upload the rendered PNG. GetObject because the action presigns
+    # a GET URL signed by THIS role — S3 authorizes the presigned request as the
+    # signing principal, so without GetObject the embedded image URL 403s.
+    actions   = ["s3:PutObject", "s3:GetObject"]
     effect    = "Allow"
     resources = ["${aws_s3_bucket.shots.arn}/burnmap/*"]
   }

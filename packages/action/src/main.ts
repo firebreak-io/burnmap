@@ -15,6 +15,11 @@ async function main(): Promise<void> {
   const bucket = core.getInput('s3-bucket', { required: true });
   const region = core.getInput('aws-region') || process.env.AWS_REGION || 'us-east-1';
   const ttlSeconds = Number(core.getInput('url-ttl-seconds') || '86400');
+  // S3 SigV4 presigned URLs cap at 7 days (604800s); reject NaN / out-of-range early.
+  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 604800) {
+    core.setFailed('url-ttl-seconds must be an integer between 1 and 604800 (S3 presigned-URL max is 7 days)');
+    return;
+  }
   const token = core.getInput('github-token', { required: true });
   const webDist = core.getInput('web-dist') || resolveWebDist();
 
