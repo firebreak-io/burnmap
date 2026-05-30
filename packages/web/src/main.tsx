@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './components/App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { sampleModel } from './sample-data';
 import { markReady, readModel } from './ready';
 import './theme.css';
@@ -13,7 +14,9 @@ if (!container) throw new Error('missing #root element');
 
 createRoot(container).render(
   <StrictMode>
-    <App model={model} />
+    <ErrorBoundary>
+      <App model={model} />
+    </ErrorBoundary>
   </StrictMode>,
 );
 
