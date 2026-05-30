@@ -3,14 +3,11 @@ import { ACTION_GLYPH, ACTION_KIND } from '../glyphs';
 import { formatAttr, isHighRisk, relativeAddress } from '../model-view';
 
 export function anchorId(address: string): string {
-  // Preserve underscores (common in resource type names); collapse other
-  // non-alphanumerics to '-'. DangerIndex links use this same function, so
-  // index anchors always match row ids.
-  // Limitation: '.' and '-' both collapse to '-', so two addresses differing
-  // only by '.'/'-' would collide. Real Terraform addresses use '.' purely as a
-  // structural separator and never contain literal hyphens in type/module
-  // segments, so collisions are not expected in practice.
-  return `r-${address.replace(/[^a-zA-Z0-9_]+/g, '-')}`;
+  // Lossless, injective id: encodeURIComponent is reversible, so two distinct
+  // addresses can never collide (e.g. "...foo-bar" vs "...foo.bar" map to
+  // different ids). DangerIndex links use this same function, so index anchors
+  // always match row ids. Percent-escapes are valid in HTML ids and URL fragments.
+  return `r-${encodeURIComponent(address)}`;
 }
 
 function AddressLabel({ rc }: { rc: ResourceChange }) {

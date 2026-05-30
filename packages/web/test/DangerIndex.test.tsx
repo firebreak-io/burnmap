@@ -13,6 +13,7 @@ describe('DangerIndex', () => {
     render(<DangerIndex model={sampleModel} />);
     expect(screen.getByText(/2 high-risk/)).toBeInTheDocument();
     const dbChip = screen.getByText('module.data.aws_db_instance.main').closest('a');
-    expect(dbChip).toHaveAttribute('href', '#r-module-data-aws_db_instance-main');
+    // anchorId is lossless (encodeURIComponent); these chars are all unreserved.
+    expect(dbChip).toHaveAttribute('href', '#r-module.data.aws_db_instance.main');
   });
 });
