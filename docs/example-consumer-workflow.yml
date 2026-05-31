@@ -1,0 +1,51 @@
+# Example consumer workflow — copy into a Terraform/OpenTofu repo at
+# .github/workflows/burnmap.yml to post a plan diagram as a sticky PR comment.
+#
+# One-time prerequisites (see docs/live-verification.md):
+#   - the burnmap S3 bucket + GitHub-OIDC "burnmap-uploader" role provisioned
+#     from packages/action/infra
+#   - a release tag (e.g. v1) on firebreak-io/burnmap, or pin to a commit SHA
+#
+# Replace the <PLACEHOLDERS> below.
+
+name: tofu plan + burnmap
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write   # post / update the sticky comment
+  id-token: write        # mint the OIDC token to assume the AWS upload role
+
+jobs:
+  burnmap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Assume the burnmap uploader role (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/burnmap-uploader
+          aws-region: us-east-1
+
+      - name: Generate the plan JSON
+        run: |
+          tofu init -input=false
+          tofu plan -out=tfplan -input=false
+          tofu show -json tfplan > plan.json
+
+      - name: Render plan as a PR comment
+        uses: firebreak-io/burnmap@v1   # until v1 is tagged, use @main or a commit SHA
+        with:
+          plan-json: plan.json
+          s3-bucket: <YOUR_BURNMAP_BUCKET>
+          # Optional inputs (defaults shown):
+          # aws-region: us-east-1
+          # url-ttl-seconds: "86400"          # 1..604800 (S3 SigV4 max = 7 days)
+          # github-token: ${{ github.token }} # needs pull-requests: write
+          # web-dist: ""                      # override bundled SPA (rarely needed)
