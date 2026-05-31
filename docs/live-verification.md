@@ -23,7 +23,7 @@ tofu plan \
 tofu apply tfplan
 ```
 
-Capture the outputs — you'll need them in steps 2 and 4:
+Capture the outputs — you'll need them in step 5 (the real PR test), to fill in the consumer workflow's `uploader_role_arn` and `bucket_name`:
 
 ```bash
 tofu output            # bucket_name, uploader_role_arn
@@ -62,8 +62,8 @@ check that parse → render → screenshot works on your machine:
 
 ```bash
 npm install
-npm run build -w @burnmap/web          # shoot needs the built SPA
-npx playwright install chromium        # one-time
+npm run build --workspaces --if-present # build parser + web + shoot dist (the CLI needs all three)
+npx playwright install chromium         # one-time
 
 # Use any `tofu show -json` output, or a fixture:
 node packages/shoot/dist/cli.js \
