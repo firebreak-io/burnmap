@@ -44,3 +44,30 @@ resource "aws_iam_role_policy" "put_shots" {
   role   = aws_iam_role.uploader.id
   policy = data.aws_iam_policy_document.put_shots.json
 }
+
+# Long-lived IAM user used ONLY to presign image GET URLs. The uploader role's
+# OIDC session creds are temporary, so URLs they sign expire with the session
+# (~1-12h) — often before GitHub's Camo proxy caches the image. Static user
+# credentials lift the presigned-URL lifetime to the S3 SigV4 max of 7 days.
+# Scoped to GetObject on burnmap/* only; it cannot upload.
+resource "aws_iam_user" "presigner" {
+  name = "burnmap-presigner"
+}
+
+data "aws_iam_policy_document" "get_shots" {
+  statement {
+    actions   = ["s3:GetObject"]
+    effect    = "Allow"
+    resources = ["${aws_s3_bucket.shots.arn}/burnmap/*"]
+  }
+}
+
+resource "aws_iam_user_policy" "get_shots" {
+  name   = "burnmap-get-shots"
+  user   = aws_iam_user.presigner.name
+  policy = data.aws_iam_policy_document.get_shots.json
+}
+
+resource "aws_iam_access_key" "presigner" {
+  user = aws_iam_user.presigner.name
+}

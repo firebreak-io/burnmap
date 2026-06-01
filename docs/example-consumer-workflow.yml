@@ -49,3 +49,11 @@ jobs:
           # url-ttl-seconds: "86400"          # 1..604800 (S3 SigV4 max = 7 days)
           # github-token: ${{ github.token }} # needs pull-requests: write
           # web-dist: ""                      # override bundled SPA (rarely needed)
+          #
+          # Durable image URLs: presign the GET URL with the long-lived
+          # burnmap-presigner user (from the infra outputs) instead of the OIDC
+          # role's temporary creds. Without this, the URL expires with the role
+          # session (~1-12h) and the image breaks if Camo hasn't cached it yet.
+          # Pair with `url-ttl-seconds: "604800"` for a full 7-day window.
+          # presign-access-key-id: ${{ secrets.BURNMAP_PRESIGN_KEY_ID }}
+          # presign-secret-access-key: ${{ secrets.BURNMAP_PRESIGN_SECRET }}

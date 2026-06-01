@@ -21,6 +21,18 @@ inputs:
   web-dist:
     description: Override path to the built @burnmap/web dist (defaults to the bundled one).
     required: false
+  presign-access-key-id:
+    description: >-
+      Access key id of a long-lived IAM user (s3:GetObject on the bucket) used
+      ONLY to presign the image GET URL. Lets the URL stay valid for the full
+      url-ttl-seconds (up to 7 days); without it, presigning uses the caller's
+      ambient creds, so a temporary OIDC-role session caps the URL at ~1-12h and
+      the image breaks once the session expires. Uploads always use the ambient
+      creds. Must be set together with presign-secret-access-key.
+    required: false
+  presign-secret-access-key:
+    description: Secret access key paired with presign-access-key-id.
+    required: false
 outputs:
   image-url:
     description: Presigned URL of the uploaded diagram.

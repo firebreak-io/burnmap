@@ -42,4 +42,33 @@ describe('uploadAndPresign', () => {
       { expiresIn: 3600 },
     );
   });
+
+  it('presigns with the main client when no presignClient is given', async () => {
+    s3Mock.on(PutObjectCommand).resolves({});
+    const client = new S3Client({ region: 'us-east-1' });
+    await uploadAndPresign({
+      client, bucket: 'b', key: 'k', body: Buffer.from('x'), ttlSeconds: 3600,
+    });
+    expect(getSignedUrl).toHaveBeenCalledWith(client, expect.anything(), { expiresIn: 3600 });
+  });
+
+  it('presigns with a dedicated presignClient when provided (upload still via the main client)', async () => {
+    s3Mock.on(PutObjectCommand).resolves({});
+    const client = new S3Client({ region: 'us-east-1' });
+    const presignClient = new S3Client({ region: 'us-east-1' });
+    // 7-day TTL is only viable with the presigner's long-lived static creds.
+    const url = await uploadAndPresign({
+      client, presignClient, bucket: 'burnmap-shots', key: 'burnmap/x/y/1/s.png',
+      body: Buffer.from('PNGDATA'), ttlSeconds: 604800,
+    });
+    expect(url).toBe('https://signed.example/shot.png?sig=abc');
+    // upload goes through the main (OIDC) client
+    expect(s3Mock.commandCalls(PutObjectCommand)).toHaveLength(1);
+    // ...but the GET URL is signed by the dedicated presign client, not the main one
+    expect(getSignedUrl).toHaveBeenCalledWith(
+      presignClient,
+      expect.objectContaining({ input: { Bucket: 'burnmap-shots', Key: 'burnmap/x/y/1/s.png' } }),
+      { expiresIn: 604800 },
+    );
+  });
 });
