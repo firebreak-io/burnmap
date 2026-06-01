@@ -14,15 +14,20 @@ export function s3Key({ repo, prNumber, sha }: S3KeyParts): string {
 
 export interface UploadOptions {
   client: S3Client;
+  /** Optional client used ONLY to presign the GET URL. Supply one backed by
+   *  long-lived (non-session) credentials to lift the presigned-URL lifetime to
+   *  the S3 SigV4 max of 7 days — temporary session creds (e.g. an OIDC role)
+   *  cap it at their session length. Defaults to `client`. */
+  presignClient?: S3Client;
   bucket: string;
   key: string;
   body: Buffer;
   ttlSeconds: number;
 }
 
-/** Upload the PNG to a private bucket and return a short-TTL presigned GET URL. */
+/** Upload the PNG to a private bucket and return a presigned GET URL. */
 export async function uploadAndPresign(opts: UploadOptions): Promise<string> {
-  const { client, bucket, key, body, ttlSeconds } = opts;
+  const { client, presignClient, bucket, key, body, ttlSeconds } = opts;
   await client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
@@ -30,7 +35,7 @@ export async function uploadAndPresign(opts: UploadOptions): Promise<string> {
     ContentType: 'image/png',
   }));
   return getSignedUrl(
-    client,
+    presignClient ?? client,
     new GetObjectCommand({ Bucket: bucket, Key: key }),
     { expiresIn: ttlSeconds },
   );
