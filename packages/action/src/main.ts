@@ -33,6 +33,12 @@ async function main(): Promise<void> {
     core.setFailed('presign-access-key-id and presign-secret-access-key must be set together');
     return;
   }
+  if (presignKeyId) {
+    // Mask both so neither leaks into (potentially public) Actions logs via an
+    // AWS SDK error or debug output that echoes the credentials.
+    core.setSecret(presignKeyId);
+    core.setSecret(presignSecret);
+  }
 
   const prNumber = context.payload.pull_request?.number;
   if (!prNumber) {

@@ -10,7 +10,12 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 }));
 
 const s3Mock = mockClient(S3Client);
-beforeEach(() => s3Mock.reset());
+beforeEach(() => {
+  s3Mock.reset();
+  // Clear getSignedUrl call history so each test's toHaveBeenCalledWith only
+  // sees its own calls (clearAllMocks keeps the mocked implementation).
+  vi.clearAllMocks();
+});
 
 describe('s3Key', () => {
   it('namespaces by owner/repo/pr/sha', () => {

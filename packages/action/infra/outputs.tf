@@ -11,6 +11,9 @@ output "uploader_role_arn" {
 output "presigner_access_key_id" {
   description = "Access key id for the burnmap-presigner user. Set as the consumer's presign-access-key-id (e.g. a GitHub Actions secret) for 7-day image URLs."
   value       = aws_iam_access_key.presigner.id
+  # Not a secret on its own, but marked sensitive so it isn't echoed into logs
+  # or copied around alongside the secret key. Read with `tofu output -raw`.
+  sensitive = true
 }
 
 output "presigner_secret_access_key" {

@@ -31,6 +31,11 @@ tofu output -raw presigner_access_key_id
 tofu output -raw presigner_secret_access_key   # sensitive — store as a secret
 ```
 
+> **Treat `terraform.tfstate` as a secret.** This stack uses *local* state, so
+> the presigner secret access key is persisted in `terraform.tfstate` (not just
+> printed by `tofu output`). Keep it gitignored, never commit it, and store it
+> somewhere encrypted.
+
 What this creates:
 - a **private** S3 bucket (all public access blocked, `BucketOwnerEnforced`,
   objects under `burnmap/` expire after `image_expiry_days`, default 30)
