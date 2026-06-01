@@ -27,7 +27,14 @@ Capture the outputs — you'll need them in step 5 (the real PR test), to fill i
 
 ```bash
 tofu output            # bucket_name, uploader_role_arn
+tofu output -raw presigner_access_key_id
+tofu output -raw presigner_secret_access_key   # sensitive — store as a secret
 ```
+
+> **Treat `terraform.tfstate` as a secret.** This stack uses *local* state, so
+> the presigner secret access key is persisted in `terraform.tfstate` (not just
+> printed by `tofu output`). Keep it gitignored, never commit it, and store it
+> somewhere encrypted.
 
 What this creates:
 - a **private** S3 bucket (all public access blocked, `BucketOwnerEnforced`,
@@ -35,6 +42,13 @@ What this creates:
 - an IAM role **`burnmap-uploader`** assumable via GitHub OIDC, scoped to
   `repo:firebreak-io/burnmap:*`, with `s3:PutObject` + `s3:GetObject` on
   `burnmap/*` only.
+- an IAM user **`burnmap-presigner`** with a long-lived access key and
+  `s3:GetObject` on `burnmap/*` only. Optional: pass its key to the action's
+  `presign-access-key-id` / `presign-secret-access-key` so the image URL is
+  signed with static creds and stays valid for the full `url-ttl-seconds` (up
+  to 7 days). Without it, the URL is signed by the uploader role's *temporary*
+  session creds and expires with the session (~1-12h) — if GitHub's Camo proxy
+  hasn't cached the image by then, the comment shows "Error Fetching Resource".
 
 To allow the action to run from a *different* repo, set
 `-var github_repo=<owner>/<that-repo>` (or widen the trust `sub` condition).

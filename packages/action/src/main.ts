@@ -23,6 +23,23 @@ async function main(): Promise<void> {
   const token = core.getInput('github-token', { required: true });
   const webDist = core.getInput('web-dist') || resolveWebDist();
 
+  // Optional long-lived credentials used ONLY to presign the GET URL. The
+  // upload keeps using the ambient (OIDC) creds; presigning with static creds
+  // lets the URL stay valid up to 7 days so GitHub's Camo proxy can cache the
+  // image before it expires. Both must be set together, or neither.
+  const presignKeyId = core.getInput('presign-access-key-id');
+  const presignSecret = core.getInput('presign-secret-access-key');
+  if (Boolean(presignKeyId) !== Boolean(presignSecret)) {
+    core.setFailed('presign-access-key-id and presign-secret-access-key must be set together');
+    return;
+  }
+  if (presignKeyId) {
+    // Mask both so neither leaks into (potentially public) Actions logs via an
+    // AWS SDK error or debug output that echoes the credentials.
+    core.setSecret(presignKeyId);
+    core.setSecret(presignSecret);
+  }
+
   const prNumber = context.payload.pull_request?.number;
   if (!prNumber) {
     core.setFailed('burnmap must run on a pull_request event (no PR number in context)');
@@ -32,6 +49,9 @@ async function main(): Promise<void> {
   const sha = context.payload.pull_request?.head?.sha ?? context.sha;
 
   const s3 = new S3Client({ region });
+  const presignS3 = presignKeyId
+    ? new S3Client({ region, credentials: { accessKeyId: presignKeyId, secretAccessKey: presignSecret } })
+    : undefined;
   const octokit = getOctokit(token);
 
   const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
@@ -43,7 +63,7 @@ async function main(): Promise<void> {
         cleanupShotHtml,
         capture: (o) => capture(o),
         readPng: (p) => readFileSync(p),
-        uploadAndPresign: (o) => uploadAndPresign({ client: s3, ...o }),
+        uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
         upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
       },
       {
