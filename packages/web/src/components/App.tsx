@@ -22,7 +22,9 @@ export function App({ model }: { model: ChangeModel }) {
             ? model.modules.map((group) => (
                 <ModuleGroupView group={group} key={group.module || 'root'} />
               ))
-            : <NoChanges />}
+            : (
+                <NoChanges />
+              )}
           <Outputs outputs={model.outputs} />
         </div>
       </div>
