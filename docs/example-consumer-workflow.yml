@@ -45,7 +45,7 @@ jobs:
           plan-json: plan.json
           s3-bucket: <YOUR_BURNMAP_BUCKET>
           # Optional inputs (defaults shown):
-          # aws-region: us-east-1
+          # aws-region: us-west-2
           # url-ttl-seconds: "86400"          # 1..604800 (S3 SigV4 max = 7 days)
           # github-token: ${{ github.token }} # needs pull-requests: write
           # web-dist: ""                      # override bundled SPA (rarely needed)
