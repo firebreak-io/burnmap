@@ -31,7 +31,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/burnmap-uploader
-          aws-region: us-east-1
+          aws-region: us-west-2
 
       - name: Generate the plan JSON
         run: |
