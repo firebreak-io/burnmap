@@ -10,48 +10,32 @@ GitHub + AWS. Nothing here was exercised by the unit/integration test suites.
 
 ## 1. Provision the AWS infrastructure (S3 bucket + OIDC role)
 
-From the repo root, with AWS credentials for the target account exported:
+burnmap needs three AWS resources. Create them with your own IaC (OpenTofu,
+CloudFormation, CDK, etc.) — burnmap ships no infra module. Required:
 
-```bash
-cd packages/action/infra
-tofu init
-tofu plan \
-  -var bucket_name=<globally-unique-bucket-name> \
-  -var github_repo=firebreak-io/burnmap \
-  -out=tfplan
-# Review the plan, then:
-tofu apply tfplan
-```
-
-Capture the outputs — you'll need them in step 5 (the real PR test), to fill in the consumer workflow's `uploader_role_arn` and `bucket_name`:
-
-```bash
-tofu output            # bucket_name, uploader_role_arn
-tofu output -raw presigner_access_key_id
-tofu output -raw presigner_secret_access_key   # sensitive — store as a secret
-```
-
-> **Treat `terraform.tfstate` as a secret.** This stack uses *local* state, so
-> the presigner secret access key is persisted in `terraform.tfstate` (not just
-> printed by `tofu output`). Keep it gitignored, never commit it, and store it
-> somewhere encrypted.
-
-What this creates:
-- a **private** S3 bucket (all public access blocked, `BucketOwnerEnforced`,
-  objects under `burnmap/` expire after `image_expiry_days`, default 30)
-- an IAM role **`burnmap-uploader`** assumable via GitHub OIDC, scoped to
-  `repo:firebreak-io/burnmap:*`, with `s3:PutObject` + `s3:GetObject` on
-  `burnmap/*` only.
-- an IAM user **`burnmap-presigner`** with a long-lived access key and
-  `s3:GetObject` on `burnmap/*` only. Optional: pass its key to the action's
+- a **private** S3 bucket for the rendered PNGs — block all public access,
+  `BucketOwnerEnforced` ownership, and a lifecycle rule expiring objects under
+  `burnmap/` (e.g. after 30 days; reviewers reach them via presigned URLs).
+- an IAM role assumable via **GitHub OIDC**
+  (`token.actions.githubusercontent.com`), trust scoped to
+  `repo:<owner>/<repo>:*`, granting `s3:PutObject` + `s3:GetObject` on
+  `arn:aws:s3:::<bucket>/burnmap/*`. The action assumes this role to upload the
+  image. (`GetObject` is required because the action can presign the GET URL as
+  this same principal — without it the embedded image 403s.)
+- *(optional, for durable image URLs)* an IAM **user** with a long-lived access
+  key and `s3:GetObject` on `burnmap/*` only. Pass its key to the action's
   `presign-access-key-id` / `presign-secret-access-key` so the image URL is
   signed with static creds and stays valid for the full `url-ttl-seconds` (up
-  to 7 days). Without it, the URL is signed by the uploader role's *temporary*
+  to 7 days). Without it, the URL is signed by the OIDC role's *temporary*
   session creds and expires with the session (~1-12h) — if GitHub's Camo proxy
   hasn't cached the image by then, the comment shows "Error Fetching Resource".
 
-To allow the action to run from a *different* repo, set
-`-var github_repo=<owner>/<that-repo>` (or widen the trust `sub` condition).
+You'll need the bucket name and the role ARN in step 5 (the real PR test).
+
+> **If your IaC creates the presigner user's access key, treat its state as a
+> secret** — the secret access key lands in state, not just CLI output. Use a
+> remote encrypted backend (or keep local state gitignored and encrypted), and
+> store the key itself as a GitHub Actions secret.
 
 ---
 
