@@ -52,3 +52,14 @@ export function relativeAddress(rc: ResourceChange): string {
   }
   return rc.address;
 }
+
+/**
+ * True when the plan has resource actions to take (create/update/replace/delete).
+ * `model.modules` is built by the parser from exactly those displayed actions
+ * — `no-op`/`read` are excluded — so an empty `modules` means "no changes",
+ * mirroring tofu's own "No changes" determination. Output changes and drift are
+ * handled separately (as tofu does) and do not affect this predicate.
+ */
+export function hasResourceChanges(model: ChangeModel): boolean {
+  return model.modules.length > 0;
+}

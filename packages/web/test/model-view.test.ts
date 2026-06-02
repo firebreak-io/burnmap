@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress, MAX_VALUE_LEN,
+  HIGH_RISK_THRESHOLD, isHighRisk, highRiskList, formatValue, formatAttr, relativeAddress, MAX_VALUE_LEN, hasResourceChanges,
 } from '../src/model-view';
 import type { ChangeModel, ResourceChange, AttrChange } from '@burnmap/parser';
 
@@ -74,5 +74,17 @@ describe('relativeAddress', () => {
   });
   it('returns the full address for the root module', () => {
     expect(relativeAddress(rc({ address: 'aws_s3_bucket.logs', module: '' }))).toBe('aws_s3_bucket.logs');
+  });
+});
+
+describe('hasResourceChanges', () => {
+  it('is false when there are no module groups', () => {
+    expect(hasResourceChanges({ modules: [] } as unknown as ChangeModel)).toBe(false);
+  });
+  it('is true when at least one module group is present', () => {
+    const model = {
+      modules: [{ module: '', types: [{ type: 'aws_x', resources: [rc({})] }] }],
+    } as unknown as ChangeModel;
+    expect(hasResourceChanges(model)).toBe(true);
   });
 });
