@@ -4,4 +4,7 @@ dist/
 *.tfplan
 tfplan
 plan.json
+*.tfstate
+*.tfstate.*
+.terraform/
 .DS_Store
