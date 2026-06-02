@@ -100,3 +100,17 @@ export const sampleModel: ChangeModel = {
     { name: 'db_endpoint', action: 'update', sensitive: false },
   ],
 };
+
+/** A no-changes plan: no resource actions, no outputs. Used to preview/test the empty state. */
+export const emptyModel: ChangeModel = {
+  meta: {
+    repo: 'firebreak-io/infra',
+    prNumber: 142,
+    commitSha: 'a1b9c2f',
+    terraformVersion: '1.12.1',
+    generatedAt: '2026-05-29T00:00:00Z',
+  },
+  summary: { create: 0, update: 0, delete: 0, replace: 0, noop: 3, read: 1 },
+  modules: [],
+  outputs: [],
+};
