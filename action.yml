@@ -13,7 +13,7 @@ inputs:
   aws-region:
     description: AWS region for the S3 client.
     required: false
-    default: us-east-1
+    default: us-west-2
   url-ttl-seconds:
     description: Presigned URL TTL (seconds). GitHub's Camo proxy caches the image at render time.
     required: false
