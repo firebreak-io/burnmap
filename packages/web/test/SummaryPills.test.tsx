@@ -18,4 +18,9 @@ describe('SummaryPills', () => {
     expect(screen.queryByText('add')).not.toBeInTheDocument();
     expect(screen.getByText('replace')).toBeInTheDocument();
   });
+
+  it('renders nothing when there are no displayable changes', () => {
+    const { container } = render(<SummaryPills summary={{ create: 0, update: 0, delete: 0, replace: 0, noop: 3, read: 1 }} />);
+    expect(container.firstChild).toBeNull();
+  });
 });

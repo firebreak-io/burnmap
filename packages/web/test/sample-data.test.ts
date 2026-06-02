@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sampleModel } from '../src/sample-data';
+import { sampleModel, emptyModel } from '../src/sample-data';
 import { highRiskList } from '../src/model-view';
 import type { Action } from '@burnmap/parser';
 
@@ -21,5 +21,14 @@ describe('sampleModel', () => {
     expect(counted('update')).toBe(sampleModel.summary.update);
     expect(counted('delete')).toBe(sampleModel.summary.delete);
     expect(counted('replace')).toBe(sampleModel.summary.replace);
+  });
+});
+
+describe('emptyModel', () => {
+  it('has no module groups (a no-changes plan)', () => {
+    expect(emptyModel.modules).toEqual([]);
+  });
+  it('still carries meta so the card header renders', () => {
+    expect(emptyModel.meta.repo).toBeTruthy();
   });
 });

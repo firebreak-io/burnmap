@@ -9,9 +9,11 @@ export function SummaryPills({ summary }: { summary: ChangeSummary }) {
     { kind: 'replace', label: 'replace', count: summary.replace },
     { kind: 'destroy', label: 'destroy', count: summary.delete },
   ];
+  const visible = pills.filter((p) => p.count > 0);
+  if (visible.length === 0) return null;
   return (
     <div className="summary">
-      {pills.filter((p) => p.count > 0).map((p) => (
+      {visible.map((p) => (
         <span key={p.kind} className={`pill ${p.kind}`}>
           <span className="n">{p.count}</span> {p.label}
         </span>

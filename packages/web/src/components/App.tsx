@@ -3,6 +3,8 @@ import { SummaryPills } from './SummaryPills';
 import { DangerIndex } from './DangerIndex';
 import { ModuleGroupView } from './ModuleGroupView';
 import { Outputs } from './Outputs';
+import { NoChanges } from './NoChanges';
+import { hasResourceChanges } from '../model-view';
 
 export function App({ model }: { model: ChangeModel }) {
   const { meta } = model;
@@ -16,9 +18,13 @@ export function App({ model }: { model: ChangeModel }) {
         <div className="body">
           <SummaryPills summary={model.summary} />
           <DangerIndex model={model} />
-          {model.modules.map((group) => (
-            <ModuleGroupView group={group} key={group.module || 'root'} />
-          ))}
+          {hasResourceChanges(model)
+            ? model.modules.map((group) => (
+                <ModuleGroupView group={group} key={group.module || 'root'} />
+              ))
+            : (
+                <NoChanges />
+              )}
           <Outputs outputs={model.outputs} />
         </div>
       </div>
