@@ -91,3 +91,13 @@ body {
 
 .outputs { margin-top: 4px; }
 .out-action { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+
+.empty { text-align: center; padding: 28px 16px 24px; }
+.empty-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--create-bg); color: var(--create);
+  font-size: 18px; margin-bottom: 10px;
+}
+.empty-h { margin: 0 0 4px; font-weight: 700; font-size: 14px; }
+.empty-sub { margin: 0; color: var(--muted); font-size: 12.5px; }
