@@ -1,0 +1,32 @@
+# Dependabot version updates. Security alerts are auto-enabled (public repo);
+# this adds scheduled PRs that keep dependencies current.
+version: 2
+updates:
+  # npm — one entry at the root covers the whole workspace (single lockfile).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Collapse routine bumps into two PRs/week instead of one-per-package.
+      # Majors stay separate so breaking changes get individual review.
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # Docker — keeps the Playwright base image in the Dockerfile patched.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # GitHub Actions — no workflow files today (code scanning uses default setup),
+  # but this auto-covers any CI workflows added later.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
