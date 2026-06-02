@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { App } from '../src/components/App';
-import { sampleModel } from '../src/sample-data';
+import { sampleModel, emptyModel } from '../src/sample-data';
+import type { ChangeModel } from '@burnmap/parser';
 
 describe('App', () => {
   it('renders the brand, context, summary, danger index, and module groups', () => {
@@ -16,5 +17,26 @@ describe('App', () => {
   it('matches the rendered DOM snapshot (visual-regression guard)', () => {
     const { container } = render(<App model={sampleModel} />);
     expect(container.innerHTML).toMatchSnapshot();
+  });
+
+  it('shows the no-changes banner and no module groups for an empty plan', () => {
+    render(<App model={emptyModel} />);
+    expect(screen.getByText('No infrastructure changes')).toBeInTheDocument();
+    expect(screen.queryByText(/high-risk/)).not.toBeInTheDocument();
+  });
+
+  it('shows the banner AND the outputs section for an output-only plan', () => {
+    const outputOnly: ChangeModel = {
+      ...emptyModel,
+      outputs: [{ name: 'db_endpoint', action: 'update', sensitive: false }],
+    };
+    render(<App model={outputOnly} />);
+    expect(screen.getByText('No infrastructure changes')).toBeInTheDocument();
+    expect(screen.getByText('db_endpoint')).toBeInTheDocument();
+  });
+
+  it('does not show the no-changes banner when there are resource changes', () => {
+    render(<App model={sampleModel} />);
+    expect(screen.queryByText('No infrastructure changes')).not.toBeInTheDocument();
   });
 });
