@@ -48,7 +48,7 @@ export async function capture(opts: CaptureOptions): Promise<string> {
     }
     // omitBackground drops Playwright's default white backdrop so the four
     // corners outside the card's rounded border render transparent. The shot
-    // HTML also forces the body background transparent (see buildShotHtml).
+    // HTML also forces the html/body background transparent (see buildShotHtml).
     await page.locator(selector).first().screenshot({ path: outPath, omitBackground: true });
     return outPath;
   } finally {
