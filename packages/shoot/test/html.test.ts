@@ -14,7 +14,7 @@ describe('buildShotHtml', () => {
     expect(out).toContain('./assets/index-abc.js');
   });
 
-  it('forces the body background transparent for the screenshot', () => {
+  it('forces the html/body background transparent for the screenshot', () => {
     const out = buildShotHtml(BUILT, { summary: { create: 1 } });
     expect(out).toContain('html,body{background:transparent !important;}');
   });
