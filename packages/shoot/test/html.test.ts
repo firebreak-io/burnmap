@@ -14,6 +14,11 @@ describe('buildShotHtml', () => {
     expect(out).toContain('./assets/index-abc.js');
   });
 
+  it('forces the html/body background transparent for the screenshot', () => {
+    const out = buildShotHtml(BUILT, { summary: { create: 1 } });
+    expect(out).toContain('html,body{background:transparent !important;}');
+  });
+
   it('escapes < so a value containing </script> cannot break out', () => {
     const out = buildShotHtml(BUILT, { evil: '</script><script>alert(1)</script>' });
     expect(out).not.toContain('</script><script>alert(1)');
