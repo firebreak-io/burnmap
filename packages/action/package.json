@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@burnmap/graph": "*",
     "@burnmap/parser": "*",
     "@burnmap/shoot": "*",
     "@actions/core": "^1.11.0",

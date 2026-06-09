@@ -5,11 +5,13 @@ export interface S3KeyParts {
   repo: string;      // "owner/repo"
   prNumber: number;
   sha: string;
+  kind?: 'plan' | 'arch';
 }
 
-/** Stable, per-commit object key: burnmap/<owner>/<repo>/<pr>/<sha>.png */
-export function s3Key({ repo, prNumber, sha }: S3KeyParts): string {
-  return `burnmap/${repo}/${prNumber}/${sha}.png`;
+/** Stable, per-commit object key: burnmap/<owner>/<repo>/<pr>/<sha>[-arch].png */
+export function s3Key({ repo, prNumber, sha, kind = 'plan' }: S3KeyParts): string {
+  const suffix = kind === 'arch' ? '-arch' : '';
+  return `burnmap/${repo}/${prNumber}/${sha}${suffix}.png`;
 }
 
 export interface UploadOptions {
