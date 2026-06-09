@@ -26,4 +26,22 @@ describe('runArch', () => {
     const comment = (deps.upsertStickyComment as ReturnType<typeof vi.fn>).mock.calls[0]![0];
     expect(comment.marker).toBe('<!-- burnmap:arch:pr-7 -->');
   });
+
+  it('forwards changes to archToPng when provided (both mode)', async () => {
+    const changes = { meta: {}, summary: {}, modules: [], outputs: [] } as unknown as import('@burnmap/parser').ChangeModel;
+    const archToPng = vi.fn(async (_p: unknown, _m: unknown, out: string) => out);
+    const deps: ArchRunDeps = {
+      readPlanJson: vi.fn(() => plan),
+      archToPng,
+      readPng: vi.fn(() => Buffer.from('PNG')),
+      uploadAndPresign: vi.fn(async () => 'https://signed/arch.png'),
+      upsertStickyComment: vi.fn(async () => ({ action: 'created' as const, id: 1 })),
+    };
+    await runArch(deps, {
+      planJsonPath: 'plan.json', bucket: 'b', ttlSeconds: 60,
+      repo: 'o/r', owner: 'o', repoName: 'r', prNumber: 7, sha: 'abc',
+      outPng: '/tmp/x-arch.png', changes,
+    });
+    expect(archToPng.mock.calls[0]![3]).toBe(changes);
+  });
 });

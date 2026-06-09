@@ -1,11 +1,11 @@
-import type { RawPlan } from '@burnmap/parser';
+import type { RawPlan, ChangeModel } from '@burnmap/parser';
 import type { ArchMeta } from '@burnmap/graph';
 import { s3Key } from './s3.js';
 import { archCommentMarker, buildArchCommentBody } from './arch-comment.js';
 
 export interface ArchRunDeps {
   readPlanJson: (path: string) => RawPlan;
-  archToPng: (plan: RawPlan, meta: ArchMeta, outPath: string) => Promise<string>;
+  archToPng: (plan: RawPlan, meta: ArchMeta, outPath: string, changes?: ChangeModel) => Promise<string>;
   readPng: (path: string) => Buffer;
   uploadAndPresign: (opts: {
     bucket: string; key: string; body: Buffer; ttlSeconds: number;
@@ -25,6 +25,8 @@ export interface ArchRunInputs {
   prNumber: number;
   sha: string;
   outPng: string;
+  /** When set (e.g. "both" mode), changed resources are tinted on the diagram. */
+  changes?: ChangeModel;
 }
 
 export interface ArchRunResult {
@@ -44,7 +46,7 @@ export async function runArch(deps: ArchRunDeps, inputs: ArchRunInputs): Promise
     generatedAt: new Date().toISOString(),
   };
 
-  await deps.archToPng(plan, meta, inputs.outPng);
+  await deps.archToPng(plan, meta, inputs.outPng, inputs.changes);
 
   const key = s3Key({ repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, kind: 'arch' });
   const imageUrl = await deps.uploadAndPresign({

@@ -5,6 +5,7 @@ import * as core from '@actions/core';
 import { context, getOctokit } from '@actions/github';
 import { S3Client } from '@aws-sdk/client-s3';
 import type { RawPlan } from '@burnmap/parser';
+import { parsePlan } from '@burnmap/parser';
 import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture } from '@burnmap/shoot';
 import { archToPng } from '@burnmap/graph';
 import { uploadAndPresign } from './s3.js';
@@ -93,7 +94,7 @@ async function main(): Promise<void> {
       const archResult = await runArch(
         {
           readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
-          archToPng: (plan, meta, out) => archToPng(plan, meta, out),
+          archToPng: (plan, meta, out, changes) => archToPng(plan, meta, out, changes ? { changes } : undefined),
           readPng: (p) => readFileSync(p),
           uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
           upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
@@ -102,6 +103,12 @@ async function main(): Promise<void> {
           planJsonPath, bucket, ttlSeconds,
           repo: `${owner}/${repo}`, owner, repoName: repo,
           prNumber, sha, outPng: outArchPng,
+          changes: mode === 'both'
+            ? parsePlan(JSON.parse(readFileSync(planJsonPath, 'utf8')) as RawPlan, {
+                repo: `${owner}/${repo}`, prNumber, commitSha: sha,
+                terraformVersion: 'unknown', generatedAt: new Date().toISOString(),
+              })
+            : undefined,
         },
       );
       core.setSecret(archResult.imageUrl);
