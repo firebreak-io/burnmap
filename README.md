@@ -83,6 +83,19 @@ jobs:
 
 **Output:** `image-url` — the presigned URL of the uploaded diagram.
 
+## Architecture diagrams
+
+Set `mode` to render an architecture diagram of the stack instead of (or alongside) the plan diff:
+
+- `plan` (default) renders the change-diff diagram. Unchanged behavior.
+- `arch` renders a clustered diagram of the stack's resources and their references, derived from the plan's `configuration` section. It posts as a separate sticky comment; the URL is exposed as the `arch-image-url` output.
+- `both` renders both, and tints changed resources on the architecture.
+
+Phase 1 scope: resources within one stack, with edges resolved inside a module scope (cross-module edges and data sources are not drawn yet). Generate diagrams locally with the CLI:
+
+    burnmap-graph plan.json --out arch.svg     # scalable, docs-friendly
+    burnmap-graph plan.json --out arch.png     # raster (needs Chromium)
+
 ### Durable image URLs
 
 By default the image URL is signed with the OIDC role's *temporary* session
