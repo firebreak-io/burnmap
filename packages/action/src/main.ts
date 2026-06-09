@@ -10,7 +10,7 @@ import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture } from '@burnma
 import { archToPng } from '@burnmap/graph';
 import { uploadAndPresign } from './s3.js';
 import { upsertStickyComment } from './github.js';
-import { run } from './run.js';
+import { run, type RunDeps } from './run.js';
 import { runArch } from './arch-run.js';
 
 async function main(): Promise<void> {
@@ -65,18 +65,21 @@ async function main(): Promise<void> {
 
   const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
   const outArchPng = path.join(tmpdir(), `burnmap-${sha}-arch.png`);
+
+  // Read+parse the plan once; both render paths reuse this object.
+  const rawPlan = JSON.parse(readFileSync(planJsonPath, 'utf8')) as RawPlan;
+  // Infrastructure adapters shared by the plan and arch render paths.
+  const sharedDeps: Pick<RunDeps, 'readPlanJson' | 'readPng' | 'uploadAndPresign' | 'upsertStickyComment'> = {
+    readPlanJson: () => rawPlan,
+    readPng: (p) => readFileSync(p),
+    uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
+    upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
+  };
+
   try {
     if (mode === 'plan' || mode === 'both') {
       const result = await run(
-        {
-          readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
-          writeShotHtml,
-          cleanupShotHtml,
-          capture: (o) => capture(o),
-          readPng: (p) => readFileSync(p),
-          uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
-          upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
-        },
+        { ...sharedDeps, writeShotHtml, cleanupShotHtml, capture: (o) => capture(o) },
         {
           planJsonPath, webDist, bucket, ttlSeconds,
           repo: `${owner}/${repo}`, owner, repoName: repo,
@@ -93,20 +96,19 @@ async function main(): Promise<void> {
     if (mode === 'arch' || mode === 'both') {
       const archResult = await runArch(
         {
-          readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
+          ...sharedDeps,
           archToPng: (plan, meta, out, changes) => archToPng(plan, meta, out, changes ? { changes } : undefined),
-          readPng: (p) => readFileSync(p),
-          uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
-          upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
         },
         {
           planJsonPath, bucket, ttlSeconds,
           repo: `${owner}/${repo}`, owner, repoName: repo,
           prNumber, sha, outPng: outArchPng,
+          // In "both" mode, tint the architecture with the PR's changes.
           changes: mode === 'both'
-            ? parsePlan(JSON.parse(readFileSync(planJsonPath, 'utf8')) as RawPlan, {
+            ? parsePlan(rawPlan, {
                 repo: `${owner}/${repo}`, prNumber, commitSha: sha,
-                terraformVersion: 'unknown', generatedAt: new Date().toISOString(),
+                terraformVersion: rawPlan.terraform_version ?? 'unknown',
+                generatedAt: new Date().toISOString(),
               })
             : undefined,
         },
