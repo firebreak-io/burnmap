@@ -33,9 +33,15 @@ inputs:
   presign-secret-access-key:
     description: Secret access key paired with presign-access-key-id.
     required: false
+  mode:
+    description: "What to render: plan (diff, default) | arch (architecture) | both."
+    required: false
+    default: plan
 outputs:
   image-url:
     description: Presigned URL of the uploaded diagram.
+  arch-image-url:
+    description: Presigned URL of the uploaded architecture diagram (arch/both mode).
 runs:
   using: docker
   image: Dockerfile

@@ -6,9 +6,11 @@ import { context, getOctokit } from '@actions/github';
 import { S3Client } from '@aws-sdk/client-s3';
 import type { RawPlan } from '@burnmap/parser';
 import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture } from '@burnmap/shoot';
+import { archToPng } from '@burnmap/graph';
 import { uploadAndPresign } from './s3.js';
 import { upsertStickyComment } from './github.js';
 import { run } from './run.js';
+import { runArch } from './arch-run.js';
 
 async function main(): Promise<void> {
   const planJsonPath = core.getInput('plan-json', { required: true });
@@ -22,6 +24,12 @@ async function main(): Promise<void> {
   }
   const token = core.getInput('github-token', { required: true });
   const webDist = core.getInput('web-dist') || resolveWebDist();
+
+  const mode = (core.getInput('mode') || 'plan').toLowerCase();
+  if (!['plan', 'arch', 'both'].includes(mode)) {
+    core.setFailed(`mode must be one of plan | arch | both (got "${mode}")`);
+    return;
+  }
 
   // Optional long-lived credentials used ONLY to presign the GET URL. The
   // upload keeps using the ambient (OIDC) creds; presigning with static creds
@@ -55,30 +63,54 @@ async function main(): Promise<void> {
   const octokit = getOctokit(token);
 
   const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
+  const outArchPng = path.join(tmpdir(), `burnmap-${sha}-arch.png`);
   try {
-    const result = await run(
-      {
-        readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
-        writeShotHtml,
-        cleanupShotHtml,
-        capture: (o) => capture(o),
-        readPng: (p) => readFileSync(p),
-        uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
-        upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
-      },
-      {
-        planJsonPath, webDist, bucket, ttlSeconds,
-        repo: `${owner}/${repo}`, owner, repoName: repo,
-        prNumber, sha, outPng,
-      },
-    );
-    // The presigned URL is a bearer credential for the image — mask it so it
-    // never appears in (potentially public) Actions logs, including the output.
-    core.setSecret(result.imageUrl);
-    core.setOutput('image-url', result.imageUrl);
-    core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
+    if (mode === 'plan' || mode === 'both') {
+      const result = await run(
+        {
+          readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
+          writeShotHtml,
+          cleanupShotHtml,
+          capture: (o) => capture(o),
+          readPng: (p) => readFileSync(p),
+          uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
+          upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
+        },
+        {
+          planJsonPath, webDist, bucket, ttlSeconds,
+          repo: `${owner}/${repo}`, owner, repoName: repo,
+          prNumber, sha, outPng,
+        },
+      );
+      // The presigned URL is a bearer credential for the image — mask it so it
+      // never appears in (potentially public) Actions logs, including the output.
+      core.setSecret(result.imageUrl);
+      core.setOutput('image-url', result.imageUrl);
+      core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
+    }
+
+    if (mode === 'arch' || mode === 'both') {
+      const archResult = await runArch(
+        {
+          readPlanJson: (p) => JSON.parse(readFileSync(p, 'utf8')) as RawPlan,
+          archToPng: (plan, meta, out) => archToPng(plan, meta, out),
+          readPng: (p) => readFileSync(p),
+          uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
+          upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
+        },
+        {
+          planJsonPath, bucket, ttlSeconds,
+          repo: `${owner}/${repo}`, owner, repoName: repo,
+          prNumber, sha, outPng: outArchPng,
+        },
+      );
+      core.setSecret(archResult.imageUrl);
+      core.setOutput('arch-image-url', archResult.imageUrl);
+      core.info(`burnmap ${archResult.commentAction} arch comment ${archResult.commentId}`);
+    }
   } finally {
-    rmSync(outPng, { force: true }); // remove the intermediate PNG (already uploaded to S3)
+    rmSync(outPng, { force: true });
+    rmSync(outArchPng, { force: true });
   }
 }
 
