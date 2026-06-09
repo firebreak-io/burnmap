@@ -31,3 +31,23 @@ describe('parseArch — nodes & clusters', () => {
     expect(sub?.cluster).toBe('module.network');
   });
 });
+
+describe('parseArch — edges', () => {
+  it('emits referencer->referenced edges, deduped, within root scope', () => {
+    const m = parseArch(load('flat-stack.json'), META);
+    const edges = m.edges.map((e) => `${e.from}->${e.to}`).sort();
+    expect(edges).toEqual([
+      'aws_instance.web->aws_security_group.web',
+      'aws_instance.web->aws_subnet.app',
+      'aws_security_group.web->aws_vpc.main',
+      'aws_subnet.app->aws_vpc.main',
+    ]);
+  });
+
+  it('does not emit edges to data sources, vars, or across modules', () => {
+    const m = parseArch(load('nested-modules.json'), META);
+    expect(m.edges.map((e) => `${e.from}->${e.to}`)).toEqual([
+      'module.network.aws_subnet.this->module.network.aws_vpc.this',
+    ]);
+  });
+});
