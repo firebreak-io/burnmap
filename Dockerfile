@@ -2,6 +2,12 @@
 FROM mcr.microsoft.com/playwright:v1.60.0-jammy
 
 WORKDIR /burnmap
+
+# Fonts for caption rendering (broad Unicode coverage; don't rely on host fonts).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends fonts-noto-core fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 
