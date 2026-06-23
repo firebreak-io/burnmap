@@ -6,7 +6,7 @@ import { archCommentMarker, buildArchCommentBody } from './arch-comment.js';
 export interface ArchRunDeps {
   readPlanJson: (path: string) => RawPlan;
   archToPng: (plan: RawPlan, meta: ArchMeta, outPath: string, changes?: ChangeModel) => Promise<string>;
-  readPng: (path: string) => Buffer;
+  readPng: (path: string) => Buffer | Promise<Buffer>;
   uploadAndPresign: (opts: {
     bucket: string; key: string; body: Buffer; ttlSeconds: number;
   }) => Promise<string>;
@@ -60,7 +60,7 @@ export async function renderArchImage(
     repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, kind: 'arch', slug: inputs.slug,
   });
   const imageUrl = await deps.uploadAndPresign({
-    bucket: inputs.bucket, key, body: deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
+    bucket: inputs.bucket, key, body: await deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
   });
   return { meta, imageUrl };
 }

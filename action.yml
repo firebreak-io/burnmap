@@ -42,6 +42,14 @@ inputs:
     description: "What to render: plan (diff, default) | arch (architecture) | both."
     required: false
     default: plan
+  labels-from:
+    description: "Auto-derive a per-image caption from the plan path: none | filename | path-parent | relative-path."
+    required: false
+    default: none
+  labels:
+    description: 'Explicit per-plan captions as a JSON object {"relative/path":"caption"}; overrides labels-from.'
+    required: false
+    default: ""
 outputs:
   image-url:
     description: Presigned URL of the uploaded diagram.

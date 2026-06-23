@@ -6,7 +6,7 @@ import { context, getOctokit } from '@actions/github';
 import { S3Client } from '@aws-sdk/client-s3';
 import type { RawPlan } from '@burnmap/parser';
 import { parsePlan } from '@burnmap/parser';
-import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture } from '@burnmap/shoot';
+import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture, captionPng } from '@burnmap/shoot';
 import { archToPng } from '@burnmap/graph';
 import type { ArchMeta } from '@burnmap/graph';
 import { uploadAndPresign } from './s3.js';
@@ -17,6 +17,7 @@ import { renderArchImage } from './arch-run.js';
 import { commentMarker, buildCommentBody, buildMultiCommentBody, type MultiCommentItem } from './comment.js';
 import { archCommentMarker, buildArchCommentBody, buildArchMultiCommentBody } from './arch-comment.js';
 import { resolvePlans, planSlug } from './plans.js';
+import { resolveCaption, parseLabels, type LabelsFrom } from './captions.js';
 
 async function main(): Promise<void> {
   const planJsonPath = core.getInput('plan-json', { required: true });
@@ -37,6 +38,20 @@ async function main(): Promise<void> {
   }
 
   const wantComment = core.getBooleanInput('comment'); // defaults true via action.yml
+
+  const labelsFrom = (core.getInput('labels-from') || 'none') as LabelsFrom;
+  const VALID_LABELS_FROM = ['none', 'filename', 'path-parent', 'relative-path'];
+  if (!VALID_LABELS_FROM.includes(labelsFrom)) {
+    core.setFailed(`labels-from must be one of ${VALID_LABELS_FROM.join(' | ')} (got "${labelsFrom}")`);
+    return;
+  }
+  let labels: Record<string, string>;
+  try {
+    labels = parseLabels(core.getInput('labels'));
+  } catch (err) {
+    core.setFailed(err instanceof Error ? err.message : String(err));
+    return;
+  }
 
   // Token is only needed to post a comment. In upload-only mode it is optional;
   // warn if supplied but unused.
@@ -85,6 +100,11 @@ async function main(): Promise<void> {
   }
   const multi = plans.length > 1;
 
+  const relSet = new Set(plans.map((p) => p.rel));
+  for (const key of Object.keys(labels)) {
+    if (!relSet.has(key)) core.warning(`burnmap: labels key "${key}" matched no resolved plan.`);
+  }
+
   const planUrls: string[] = [];
   const archUrls: string[] = [];
   const planItems: MultiCommentItem[] = [];
@@ -105,9 +125,22 @@ async function main(): Promise<void> {
       // renderPlanImage / renderArchImage never call upsertStickyComment; the
       // stub satisfies the deps interface without requiring octokit here.
       const neverCalled = (): never => { throw new Error('upsertStickyComment should not be called during render'); };
+
+      const caption = resolveCaption(plan.rel, { labelsFrom, labels });
+      if (caption) core.info(`burnmap: caption for ${plan.rel}: ${caption}`);
+
+      const readPngCaptioned = async (p: string): Promise<Buffer> => {
+        const raw = readFileSync(p);
+        if (!caption) return raw;
+        const capPath = `${p}.cap.png`;
+        tmpFiles.push(capPath);
+        await captionPng(raw, caption, capPath);
+        return readFileSync(capPath);
+      };
+
       const sharedDeps = {
         readPlanJson: () => rawPlan,
-        readPng: (p: string) => readFileSync(p),
+        readPng: readPngCaptioned,
         uploadAndPresign: (o: { bucket: string; key: string; body: Buffer; ttlSeconds: number }) =>
           uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
         upsertStickyComment: neverCalled,
@@ -123,7 +156,7 @@ async function main(): Promise<void> {
         );
         planUrls.push(r.imageUrl);
         planModels.push(r.model);
-        planItems.push({ rel: plan.rel, imageUrl: r.imageUrl });
+        planItems.push({ rel: plan.rel, imageUrl: r.imageUrl, caption });
       }
 
       if (mode === 'arch' || mode === 'both') {
@@ -146,7 +179,7 @@ async function main(): Promise<void> {
         );
         archUrls.push(a.imageUrl);
         archMetas.push(a.meta);
-        archItems.push({ rel: plan.rel, imageUrl: a.imageUrl });
+        archItems.push({ rel: plan.rel, imageUrl: a.imageUrl, caption });
       }
     }
 

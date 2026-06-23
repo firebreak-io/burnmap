@@ -9,7 +9,7 @@ export interface RunDeps {
   writeShotHtml: (webDist: string, model: ChangeModel) => string;
   cleanupShotHtml: (webDist: string) => void;
   capture: (opts: { shotHtmlPath: string; outPath: string }) => Promise<string>;
-  readPng: (path: string) => Buffer;
+  readPng: (path: string) => Buffer | Promise<Buffer>;
   uploadAndPresign: (opts: {
     bucket: string; key: string; body: Buffer; ttlSeconds: number;
   }) => Promise<string>;
@@ -68,7 +68,7 @@ export async function renderPlanImage(
 
   const key = s3Key({ repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, slug: inputs.slug });
   const imageUrl = await deps.uploadAndPresign({
-    bucket: inputs.bucket, key, body: deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
+    bucket: inputs.bucket, key, body: await deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
   });
   return { model, imageUrl };
 }
