@@ -83,6 +83,31 @@ jobs:
 
 **Output:** `image-url` — the presigned URL of the uploaded diagram.
 
+## Multiple plans, upload-only, and captions
+
+`plan-json` accepts a single path **or** a glob (expanded inside the action):
+
+    plan-json: 'plans/**/*.json'
+
+Each resolved plan renders and uploads independently. Outputs:
+
+- `image-url` — the first URL (lexicographic order).
+- `image-urls` — a JSON array of all URLs in stable order. Parse with
+  `fromJSON()` in a workflow.
+
+Set `comment: false` for upload-only mode — burnmap uploads and returns
+`image-urls` without touching the PR (no `pull-requests: write` or `github-token`
+needed). Use this when your workflow composes its own comment from `image-urls`.
+
+Add a caption strip to each PNG with `labels-from` (`none` default, `filename`,
+`path-parent`, `relative-path`) or explicit `labels` (a JSON object keyed by the
+plan path relative to the working directory, which overrides `labels-from`):
+
+    labels-from: path-parent
+
+    labels: |
+      { "plans/ec-dev/network/plan.json": "ec-dev / network" }
+
 ## Architecture diagrams
 
 Set `mode` to render an architecture diagram of the stack instead of (or alongside) the plan diff:
