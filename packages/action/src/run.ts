@@ -39,8 +39,16 @@ export interface RunResult {
   commentId: number;
 }
 
-/** parse → screenshot → upload+presign → upsert sticky comment. */
-export async function run(deps: RunDeps, inputs: RunInputs): Promise<RunResult> {
+export interface RenderedImage {
+  model: ChangeModel;
+  imageUrl: string;
+}
+
+/** parse → screenshot → upload+presign. No PR comment. */
+export async function renderPlanImage(
+  deps: RunDeps,
+  inputs: RunInputs & { slug?: string },
+): Promise<RenderedImage> {
   const plan = deps.readPlanJson(inputs.planJsonPath);
   const meta: ChangeMeta = {
     repo: inputs.repo,
@@ -58,16 +66,20 @@ export async function run(deps: RunDeps, inputs: RunInputs): Promise<RunResult> 
     deps.cleanupShotHtml(inputs.webDist);
   }
 
-  const key = s3Key({ repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha });
+  const key = s3Key({ repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, slug: inputs.slug });
   const imageUrl = await deps.uploadAndPresign({
     bucket: inputs.bucket, key, body: deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
   });
+  return { model, imageUrl };
+}
 
+/** parse → screenshot → upload+presign → upsert sticky comment. */
+export async function run(deps: RunDeps, inputs: RunInputs): Promise<RunResult> {
+  const { model, imageUrl } = await renderPlanImage(deps, inputs);
   const body = buildCommentBody(model, imageUrl);
   const { action, id } = await deps.upsertStickyComment({
     owner: inputs.owner, repo: inputs.repoName, prNumber: inputs.prNumber,
     marker: commentMarker(inputs.prNumber), body,
   });
-
   return { imageUrl, commentAction: action, commentId: id };
 }
