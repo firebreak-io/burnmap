@@ -3,11 +3,14 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { archToSvg, archToPng } from '@burnmap/graph';
+import { resolveWebDist, writeShotHtml, capture, cleanupShotHtml } from '@burnmap/shoot';
 import { CliError } from './errors.js';
 import { parseArgs } from './args.js';
 import { runParse } from './commands/parse.js';
 import { runArch } from './commands/arch.js';
+import { runPlan } from './commands/plan.js';
 import { ensureChromium } from './chromium.js';
+import type { ChangeModel } from '@burnmap/parser';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -45,6 +48,26 @@ async function main(argv: string[]): Promise<void> {
         renderSvg: (plan, meta) => archToSvg(plan, meta),
         renderPng: (plan, meta, out) => archToPng(plan, meta, out),
         writeFile: (p, d) => writeFileSync(p, d, 'utf8'),
+        stdout: (s) => process.stdout.write(s),
+        ensureChromium: () => ensureChromium({
+          executablePath: () => chromium.executablePath(),
+          exists: existsSync,
+        }),
+        now: () => new Date().toISOString(),
+      });
+      return;
+    case 'plan':
+      await runPlan(args, {
+        readFile: (p) => readFileSync(p, 'utf8'),
+        renderDiffPng: async (model: ChangeModel, out: string) => {
+          const webDist = resolveWebDist();
+          const shotHtml = writeShotHtml(webDist, model);
+          try {
+            await capture({ shotHtmlPath: shotHtml, outPath: out });
+          } finally {
+            cleanupShotHtml(webDist);
+          }
+        },
         stdout: (s) => process.stdout.write(s),
         ensureChromium: () => ensureChromium({
           executablePath: () => chromium.executablePath(),
