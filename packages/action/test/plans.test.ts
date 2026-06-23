@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { resolvePlans } from '../src/plans.js';
+import { resolvePlans, planSlug } from '../src/plans.js';
 
 let root: string;
 
@@ -41,5 +41,17 @@ describe('resolvePlans', () => {
 
   it('throws a clear error when nothing matches', async () => {
     await expect(resolvePlans('nope/*.json', root)).rejects.toThrow(/no plan files matched/i);
+  });
+});
+
+describe('planSlug', () => {
+  it('is deterministic and 8 hex chars', () => {
+    const a = planSlug('a/plan.json');
+    expect(a).toMatch(/^[0-9a-f]{8}$/);
+    expect(planSlug('a/plan.json')).toBe(a);
+  });
+
+  it('differs for different paths', () => {
+    expect(planSlug('a/plan.json')).not.toBe(planSlug('b/plan.json'));
   });
 });

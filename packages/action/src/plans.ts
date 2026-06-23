@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { glob } from 'tinyglobby';
 
 export interface ResolvedPlan {
@@ -35,4 +36,9 @@ export async function resolvePlans(
     throw new Error(`no plan files matched "${pattern}" (cwd: ${cwd})`);
   }
   return out;
+}
+
+/** Short, stable discriminator for a plan's relative path (S3 key slug). */
+export function planSlug(rel: string): string {
+  return createHash('sha256').update(rel).digest('hex').slice(0, 8);
 }
