@@ -132,6 +132,30 @@ for the full TTL, presign with a long-lived IAM user
 (`presign-access-key-id` / `presign-secret-access-key`) and pair it with
 `url-ttl-seconds: "604800"` for a 7-day window.
 
+## Standalone CLI
+
+burnmap's core is GitHub-free and runs locally via a single `burnmap` binary —
+no S3, no PR, no AWS. Run it without cloning:
+
+    npx github:firebreak-io/burnmap parse  plan.json
+    npx github:firebreak-io/burnmap arch   plan.json --out arch.svg
+    npx github:firebreak-io/burnmap plan   plan.json --out diff.png
+    npx github:firebreak-io/burnmap render plan.json --out-dir ./out
+
+Commands:
+
+| Command | Output | Needs Chromium |
+|---|---|---|
+| `parse <plan.json> [--out model.json]` | ChangeModel JSON (stdout if no `--out`) | no |
+| `arch <plan.json> --out <file.svg\|.png>` | architecture diagram | only for `.png` |
+| `plan <plan.json> --out <file.png>` | plan-diff diagram | yes |
+| `render <plan.json> --out-dir <dir>` | `model.json` + `arch.svg` + `diff.png` | yes |
+
+Generate `plan.json` with `tofu show -json tfplan > plan.json`. PNG output
+needs a one-time Chromium install; the CLI prints the exact command
+(`npx playwright install chromium`) if it's missing. Exit codes: `0` success,
+`2` usage / read / parse error, `3` Chromium not installed.
+
 ## AWS setup
 
 burnmap ships no infrastructure module — provision these with your own IaC:
