@@ -1,0 +1,23 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.8.0",
+  "configuration": {
+    "root_module": {
+      "resources": [
+        { "address": "aws_vpc.main", "mode": "managed", "type": "aws_vpc", "name": "main",
+          "expressions": { "cidr_block": { "constant_value": "10.0.0.0/16" } } },
+        { "address": "aws_subnet.app", "mode": "managed", "type": "aws_subnet", "name": "app",
+          "expressions": { "vpc_id": { "references": ["aws_vpc.main.id", "aws_vpc.main"] } } },
+        { "address": "aws_security_group.web", "mode": "managed", "type": "aws_security_group", "name": "web",
+          "expressions": { "vpc_id": { "references": ["aws_vpc.main.id", "aws_vpc.main"] } } },
+        { "address": "aws_instance.web", "mode": "managed", "type": "aws_instance", "name": "web",
+          "expressions": {
+            "subnet_id": { "references": ["aws_subnet.app.id", "aws_subnet.app"] },
+            "vpc_security_group_ids": { "references": ["aws_security_group.web.id", "aws_security_group.web"] }
+          } },
+        { "address": "data.aws_ami.ubuntu", "mode": "data", "type": "aws_ami", "name": "ubuntu",
+          "expressions": { "most_recent": { "constant_value": true } } }
+      ]
+    }
+  }
+}

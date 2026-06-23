@@ -22,6 +22,17 @@ describe('s3Key', () => {
     expect(s3Key({ repo: 'firebreak-io/infra', prNumber: 142, sha: 'a1b9c2f' }))
       .toBe('burnmap/firebreak-io/infra/142/a1b9c2f.png');
   });
+
+  it('omits the slug by default (backward compatible)', () => {
+    expect(s3Key({ repo: 'o/r', prNumber: 7, sha: 'abc' })).toBe('burnmap/o/r/7/abc.png');
+  });
+
+  it('appends a slug after the optional -arch suffix', () => {
+    expect(s3Key({ repo: 'o/r', prNumber: 7, sha: 'abc', slug: 'deadbe' }))
+      .toBe('burnmap/o/r/7/abc-deadbe.png');
+    expect(s3Key({ repo: 'o/r', prNumber: 7, sha: 'abc', kind: 'arch', slug: 'deadbe' }))
+      .toBe('burnmap/o/r/7/abc-arch-deadbe.png');
+  });
 });
 
 describe('uploadAndPresign', () => {
