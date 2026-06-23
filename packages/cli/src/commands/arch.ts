@@ -1,6 +1,5 @@
 import type { RawPlan, ChangeMeta } from '@burnmap/parser';
-import type { ParsedArgs } from '../args.js';
-import { outKind } from '../args.js';
+import { outKind, type ParsedArgs } from '../args.js';
 import { buildMeta } from '../meta.js';
 import { CliError } from '../errors.js';
 

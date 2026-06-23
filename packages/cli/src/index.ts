@@ -85,7 +85,7 @@ async function main(argv: string[]): Promise<void> {
         writeFile: (p, d) => writeFileSync(p, d, 'utf8'),
         renderArchSvg: (plan, meta) => archToSvg(plan, meta),
         renderDiffPng,
-        join: (a, b) => join(a, b),
+        join,
         stdout: (s) => process.stdout.write(s),
         ensureChromium: chromiumGuard,
         now: () => new Date().toISOString(),
