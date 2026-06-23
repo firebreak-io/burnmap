@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { archCommentMarker, buildArchCommentBody } from '../src/arch-comment.js';
+import { archCommentMarker, buildArchCommentBody, buildArchMultiCommentBody } from '../src/arch-comment.js';
 import { s3Key } from '../src/s3.js';
 
 describe('arch comment', () => {
@@ -22,5 +22,16 @@ describe('arch comment', () => {
       .toBe('burnmap/o/r/7/abc-arch.png');
     expect(s3Key({ repo: 'o/r', prNumber: 7, sha: 'abc' }))
       .toBe('burnmap/o/r/7/abc.png');
+  });
+});
+
+describe('buildArchMultiCommentBody', () => {
+  it('starts with the arch marker and embeds one section per item', () => {
+    const body = buildArchMultiCommentBody(7, 'o/r', 'abc', [
+      { rel: 'a/plan.json', imageUrl: 'https://s/a.png' },
+    ]);
+    expect(body.startsWith('<!-- burnmap:arch:pr-7 -->')).toBe(true);
+    expect(body).toContain('a/plan.json');
+    expect(body).toContain('![burnmap architecture](https://s/a.png)');
   });
 });

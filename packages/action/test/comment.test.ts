@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { commentMarker, buildCommentBody } from '../src/comment.js';
+import { commentMarker, buildCommentBody, buildMultiCommentBody } from '../src/comment.js';
 import type { ChangeModel } from '@burnmap/parser';
 
 const model: ChangeModel = {
@@ -46,5 +46,19 @@ describe('buildCommentBody', () => {
   it('references repo and commit in the heading', () => {
     expect(body).toContain('firebreak-io/infra');
     expect(body).toContain('a1b9c2f');
+  });
+});
+
+describe('buildMultiCommentBody', () => {
+  it('starts with the plan marker and embeds one section per item', () => {
+    const body = buildMultiCommentBody(7, 'o/r', 'abc', [
+      { rel: 'a/plan.json', imageUrl: 'https://s/a.png' },
+      { rel: 'b/plan.json', imageUrl: 'https://s/b.png', caption: 'B module' },
+    ]);
+    expect(body.startsWith('<!-- burnmap:pr-7 -->')).toBe(true);
+    expect(body).toContain('a/plan.json');
+    expect(body).toContain('![burnmap plan](https://s/a.png)');
+    expect(body).toContain('B module');           // caption overrides the heading
+    expect(body).toContain('![burnmap plan](https://s/b.png)');
   });
 });

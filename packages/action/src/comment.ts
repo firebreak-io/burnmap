@@ -53,3 +53,27 @@ export function buildCommentBody(model: ChangeModel, imageUrl: string): string {
     '</details>',
   ].join('\n');
 }
+
+export interface MultiCommentItem {
+  rel: string;
+  imageUrl: string;
+  caption?: string;
+}
+
+/** One sticky comment embedding several plan diagrams (multi-plan runs). */
+export function buildMultiCommentBody(
+  prNumber: number,
+  repo: string,
+  sha: string,
+  items: MultiCommentItem[],
+): string {
+  const lines: string[] = [
+    commentMarker(prNumber),
+    `### 🔥 burnmap — plans for \`${repo}\` @ \`${sha}\``,
+    '',
+  ];
+  for (const it of items) {
+    lines.push(`**${it.caption ?? it.rel}**`, '', `![burnmap plan](${it.imageUrl})`, '');
+  }
+  return lines.join('\n');
+}
