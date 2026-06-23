@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { createRequire } from 'node:module';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { CliError } from './errors.js';
+import { parseArgs } from './args.js';
+import { runParse } from './commands/parse.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -19,16 +22,22 @@ Options:
 `;
 
 async function main(argv: string[]): Promise<void> {
-  // Dispatch is added in later tasks. For now only global flags are handled.
-  if (argv.includes('-v') || argv.includes('--version')) {
-    process.stdout.write(`${pkg.version}\n`);
-    return;
+  const args = parseArgs(argv);
+  if (args.version) { process.stdout.write(`${pkg.version}\n`); return; }
+  if (args.help || !args.command) { process.stdout.write(USAGE); return; }
+
+  switch (args.command) {
+    case 'parse':
+      runParse(args, {
+        readFile: (p) => readFileSync(p, 'utf8'),
+        writeFile: (p, d) => writeFileSync(p, d, 'utf8'),
+        stdout: (s) => process.stdout.write(s),
+        now: () => new Date().toISOString(),
+      });
+      return;
+    default:
+      throw new CliError(`unknown command: ${args.command}\n\n${USAGE}`, 2);
   }
-  if (argv.length === 0 || argv.includes('-h') || argv.includes('--help')) {
-    process.stdout.write(USAGE);
-    return;
-  }
-  throw new CliError(`unknown command: ${argv[0]}\n\n${USAGE}`, 2);
 }
 
 main(process.argv.slice(2)).catch((err: unknown) => {
