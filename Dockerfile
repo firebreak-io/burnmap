@@ -1,5 +1,5 @@
 # Pin a Playwright image so chromium + system deps are present and reproducible.
-FROM mcr.microsoft.com/playwright:v1.60.0-jammy
+FROM mcr.microsoft.com/playwright:v1.61.0-jammy
 
 WORKDIR /burnmap
 
