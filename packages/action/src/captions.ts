@@ -35,13 +35,36 @@ function derive(rel: string, from: LabelsFrom): string {
   }
 }
 
-/** Clean control chars/newlines and truncate. */
-function clean(raw: string): string | undefined {
+export interface CaptionResolution {
+  caption: string | undefined;   // final: cleaned + truncated (same as resolveCaption)
+  full: string | undefined;      // cleaned but NOT truncated (for logging)
+  truncated: boolean;            // was the cleaned label longer than the budget?
+  hadControlChars: boolean;      // did cleaning strip any control chars/newlines?
+}
+
+/** Resolve the caption for one plan with full diagnostic detail. labels[rel] wins over labels-from. */
+export function resolveCaptionDetailed(
+  rel: string,
+  opts: { labelsFrom: LabelsFrom; labels: Record<string, string> },
+): CaptionResolution {
+  const explicit = opts.labels[rel];
+  const raw = explicit !== undefined ? explicit : derive(rel, opts.labelsFrom);
+
+  // eslint-disable-next-line no-control-regex
+  const hadControlChars = /[\x00-\x1f\x7f]/.test(raw);
+
   // strip control chars (incl. newlines/tabs/DEL), then collapse whitespace
   // eslint-disable-next-line no-control-regex
   const oneLine = raw.replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!oneLine) return undefined;
-  return oneLine.length > MAX ? `${oneLine.slice(0, MAX)}…` : oneLine;
+
+  if (!oneLine) {
+    return { caption: undefined, full: undefined, truncated: false, hadControlChars };
+  }
+
+  const truncated = oneLine.length > MAX;
+  const full = oneLine;
+  const caption = truncated ? `${oneLine.slice(0, MAX)}…` : oneLine;
+  return { caption, full, truncated, hadControlChars };
 }
 
 /** Resolve the caption for one plan. labels[rel] wins over labels-from. */
@@ -49,7 +72,5 @@ export function resolveCaption(
   rel: string,
   opts: { labelsFrom: LabelsFrom; labels: Record<string, string> },
 ): string | undefined {
-  const explicit = opts.labels[rel];
-  const raw = explicit !== undefined ? explicit : derive(rel, opts.labelsFrom);
-  return clean(raw);
+  return resolveCaptionDetailed(rel, opts).caption;
 }

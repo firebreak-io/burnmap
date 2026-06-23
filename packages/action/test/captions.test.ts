@@ -1,6 +1,6 @@
 // packages/action/test/captions.test.ts
 import { describe, it, expect } from 'vitest';
-import { parseLabels, resolveCaption } from '../src/captions.js';
+import { parseLabels, resolveCaption, resolveCaptionDetailed } from '../src/captions.js';
 
 describe('parseLabels', () => {
   it('treats empty string as no labels', () => {
@@ -46,6 +46,36 @@ describe('resolveCaption', () => {
   });
   it('preserves hyphens and slashes, collapsing only whitespace', () => {
     expect(resolveCaption('x', L({ x: 'ec-dev / network' }, 'none'))).toBe('ec-dev / network');
+  });
+});
+
+describe('resolveCaptionDetailed', () => {
+  const L = (labels: Record<string, string> = {}, labelsFrom: any = 'none') => ({ labels, labelsFrom });
+
+  it('(a) a label with a newline sets hadControlChars and full is the cleaned text', () => {
+    const res = resolveCaptionDetailed('x', L({ x: 'hello\nworld' }));
+    expect(res.hadControlChars).toBe(true);
+    expect(res.full).toBe('hello world');
+    expect(res.caption).toBe('hello world');
+    expect(res.truncated).toBe(false);
+  });
+
+  it('(b) a >80-char label sets truncated with full being the full cleaned text and caption the truncated form', () => {
+    const long = 'a'.repeat(100);
+    const res = resolveCaptionDetailed('x', L({ x: long }));
+    expect(res.truncated).toBe(true);
+    expect(res.full).toBe(long);
+    expect(res.caption).toBe(`${'a'.repeat(80)}…`);
+    expect(res.hadControlChars).toBe(false);
+  });
+
+  it('(c) a clean short label sets both flags false and full === caption', () => {
+    const res = resolveCaptionDetailed('x', L({ x: 'my-stack' }));
+    expect(res.hadControlChars).toBe(false);
+    expect(res.truncated).toBe(false);
+    expect(res.full).toBe('my-stack');
+    expect(res.caption).toBe('my-stack');
+    expect(res.full).toBe(res.caption);
   });
 });
 

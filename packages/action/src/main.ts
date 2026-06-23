@@ -17,7 +17,7 @@ import { renderArchImage } from './arch-run.js';
 import { commentMarker, buildCommentBody, buildMultiCommentBody, type MultiCommentItem } from './comment.js';
 import { archCommentMarker, buildArchCommentBody, buildArchMultiCommentBody } from './arch-comment.js';
 import { resolvePlans, planSlug } from './plans.js';
-import { resolveCaption, parseLabels, type LabelsFrom } from './captions.js';
+import { resolveCaptionDetailed, parseLabels, type LabelsFrom } from './captions.js';
 
 async function main(): Promise<void> {
   const planJsonPath = core.getInput('plan-json', { required: true });
@@ -126,8 +126,11 @@ async function main(): Promise<void> {
       // stub satisfies the deps interface without requiring octokit here.
       const neverCalled = (): never => { throw new Error('upsertStickyComment should not be called during render'); };
 
-      const caption = resolveCaption(plan.rel, { labelsFrom, labels });
-      if (caption) core.info(`burnmap: caption for ${plan.rel}: ${caption}`);
+      const res = resolveCaptionDetailed(plan.rel, { labelsFrom, labels });
+      const caption = res.caption;
+      if (res.hadControlChars) core.warning(`burnmap: caption for ${plan.rel} contained control characters; stripped.`);
+      if (res.truncated) core.info(`burnmap: full caption for ${plan.rel}: ${res.full}`);
+      else if (caption) core.info(`burnmap: caption for ${plan.rel}: ${caption}`);
 
       const readPngCaptioned = async (p: string): Promise<Buffer> => {
         const raw = readFileSync(p);
