@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runArch, type ArchRunDeps } from '../src/arch-run.js';
+import { runArch, renderArchImage, type ArchRunDeps } from '../src/arch-run.js';
 
 const plan = { terraform_version: '1.8.0', configuration: { root_module: { resources: [
   { address: 'aws_vpc.main', mode: 'managed', type: 'aws_vpc', name: 'main', expressions: {} },
@@ -43,5 +43,27 @@ describe('runArch', () => {
       outPng: '/tmp/x-arch.png', changes,
     });
     expect(archToPng.mock.calls[0]![3]).toBe(changes);
+  });
+});
+
+describe('renderArchImage', () => {
+  it('renders + uploads under the slugged arch key and does NOT comment', async () => {
+    const deps = {
+      readPlanJson: vi.fn(() => plan),
+      archToPng: vi.fn(async (_p, _m, out) => out),
+      readPng: vi.fn(() => Buffer.from('PNG')),
+      uploadAndPresign: vi.fn(async () => 'https://signed/arch.png'),
+      upsertStickyComment: vi.fn(async () => ({ action: 'created' as const, id: 1 })),
+    };
+    const res = await renderArchImage(deps as never, {
+      planJsonPath: 'plan.json', bucket: 'b', ttlSeconds: 60,
+      repo: 'o/r', owner: 'o', repoName: 'r', prNumber: 7, sha: 'abc',
+      outPng: '/tmp/x-arch.png', slug: 'deadbe',
+    });
+    expect(deps.uploadAndPresign).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'burnmap/o/r/7/abc-arch-deadbe.png' }),
+    );
+    expect(deps.upsertStickyComment).not.toHaveBeenCalled();
+    expect(res.imageUrl).toBe('https://signed/arch.png');
   });
 });

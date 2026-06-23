@@ -35,8 +35,16 @@ export interface ArchRunResult {
   commentId: number;
 }
 
-/** parse config → render arch PNG → upload+presign → upsert the arch sticky comment. */
-export async function runArch(deps: ArchRunDeps, inputs: ArchRunInputs): Promise<ArchRunResult> {
+export interface RenderedArch {
+  meta: ArchMeta;
+  imageUrl: string;
+}
+
+/** parse config → render arch PNG → upload+presign. No PR comment. */
+export async function renderArchImage(
+  deps: ArchRunDeps,
+  inputs: ArchRunInputs & { slug?: string },
+): Promise<RenderedArch> {
   const plan = deps.readPlanJson(inputs.planJsonPath);
   const meta: ArchMeta = {
     repo: inputs.repo,
@@ -48,16 +56,22 @@ export async function runArch(deps: ArchRunDeps, inputs: ArchRunInputs): Promise
 
   await deps.archToPng(plan, meta, inputs.outPng, inputs.changes);
 
-  const key = s3Key({ repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, kind: 'arch' });
+  const key = s3Key({
+    repo: inputs.repo, prNumber: inputs.prNumber, sha: inputs.sha, kind: 'arch', slug: inputs.slug,
+  });
   const imageUrl = await deps.uploadAndPresign({
     bucket: inputs.bucket, key, body: deps.readPng(inputs.outPng), ttlSeconds: inputs.ttlSeconds,
   });
+  return { meta, imageUrl };
+}
 
+/** render arch image → upsert the arch sticky comment. */
+export async function runArch(deps: ArchRunDeps, inputs: ArchRunInputs): Promise<ArchRunResult> {
+  const { meta, imageUrl } = await renderArchImage(deps, inputs);
   const body = buildArchCommentBody(meta, imageUrl);
   const { action, id } = await deps.upsertStickyComment({
     owner: inputs.owner, repo: inputs.repoName, prNumber: inputs.prNumber,
     marker: archCommentMarker(inputs.prNumber), body,
   });
-
   return { imageUrl, commentAction: action, commentId: id };
 }
