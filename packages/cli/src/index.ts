@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+import { archToSvg, archToPng } from '@burnmap/graph';
 import { CliError } from './errors.js';
 import { parseArgs } from './args.js';
 import { runParse } from './commands/parse.js';
+import { runArch } from './commands/arch.js';
+import { ensureChromium } from './chromium.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -32,6 +36,20 @@ async function main(argv: string[]): Promise<void> {
         readFile: (p) => readFileSync(p, 'utf8'),
         writeFile: (p, d) => writeFileSync(p, d, 'utf8'),
         stdout: (s) => process.stdout.write(s),
+        now: () => new Date().toISOString(),
+      });
+      return;
+    case 'arch':
+      await runArch(args, {
+        readFile: (p) => readFileSync(p, 'utf8'),
+        renderSvg: (plan, meta) => archToSvg(plan, meta),
+        renderPng: (plan, meta, out) => archToPng(plan, meta, out),
+        writeFile: (p, d) => writeFileSync(p, d, 'utf8'),
+        stdout: (s) => process.stdout.write(s),
+        ensureChromium: () => ensureChromium({
+          executablePath: () => chromium.executablePath(),
+          exists: existsSync,
+        }),
         now: () => new Date().toISOString(),
       });
       return;
