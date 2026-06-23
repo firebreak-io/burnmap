@@ -25,7 +25,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case '-h': case '--help': out.help = true; break;
       case '-v': case '--version': out.version = true; break;
       default:
-        if (!arg.startsWith('--')) positionals.push(arg);
+        if (arg.startsWith('-')) throw new CliError(`unknown option: ${arg}`, 2);
+        positionals.push(arg);
     }
   }
   out.command = positionals[0];

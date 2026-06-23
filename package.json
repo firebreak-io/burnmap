@@ -4,9 +4,11 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "engines": { "node": ">=22" },
+  "bin": { "burnmap": "packages/cli/dist/index.js" },
   "scripts": {
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "prepare": "npm run build -w @burnmap/parser && npm run build -w @burnmap/web && npm run build -w @burnmap/shoot && npm run build -w @burnmap/graph && npm run build -w @burnmap/cli"
   },
   "overrides": {
     "undici": "^6.24.0",

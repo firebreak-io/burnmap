@@ -24,6 +24,16 @@ describe('parseArgs', () => {
     expect(a.planPath).toBe('a/b/plan.json');
     expect(a.out).toBeUndefined();
   });
+
+  it('throws CliError(2) on an unrecognized long option', () => {
+    expect(() => parseArgs(['arch', 'p.json', '--out-dor', 'x.svg'])).toThrowError(CliError);
+    try { parseArgs(['arch', 'p.json', '--out-dor', 'x.svg']); } catch (e) { expect((e as CliError).code).toBe(2); }
+  });
+
+  it('throws CliError(2) on an unrecognized short option', () => {
+    expect(() => parseArgs(['parse', 'p.json', '-x'])).toThrowError(CliError);
+    try { parseArgs(['parse', 'p.json', '-x']); } catch (e) { expect((e as CliError).code).toBe(2); }
+  });
 });
 
 describe('outKind', () => {
