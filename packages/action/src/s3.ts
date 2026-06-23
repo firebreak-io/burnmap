@@ -6,12 +6,15 @@ export interface S3KeyParts {
   prNumber: number;
   sha: string;
   kind?: 'plan' | 'arch';
+  /** Short path-derived discriminator; appended only for multi-plan runs. */
+  slug?: string;
 }
 
-/** Stable, per-commit object key: burnmap/<owner>/<repo>/<pr>/<sha>[-arch].png */
-export function s3Key({ repo, prNumber, sha, kind = 'plan' }: S3KeyParts): string {
-  const suffix = kind === 'arch' ? '-arch' : '';
-  return `burnmap/${repo}/${prNumber}/${sha}${suffix}.png`;
+/** Stable, per-commit object key: burnmap/<owner>/<repo>/<pr>/<sha>[-arch][-<slug>].png */
+export function s3Key({ repo, prNumber, sha, kind = 'plan', slug }: S3KeyParts): string {
+  const archSuffix = kind === 'arch' ? '-arch' : '';
+  const slugSuffix = slug ? `-${slug}` : '';
+  return `burnmap/${repo}/${prNumber}/${sha}${archSuffix}${slugSuffix}.png`;
 }
 
 export interface UploadOptions {
