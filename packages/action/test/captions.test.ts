@@ -48,3 +48,12 @@ describe('resolveCaption', () => {
     expect(resolveCaption('x', L({ x: 'ec-dev / network' }, 'none'))).toBe('ec-dev / network');
   });
 });
+
+describe('caption no-op (regression)', () => {
+  it('none + no labels yields undefined for every path shape', () => {
+    const opts = { labelsFrom: 'none' as const, labels: {} };
+    for (const rel of ['plan.json', 'a/plan.json', 'a/b/c/plan.json']) {
+      expect(resolveCaption(rel, opts)).toBeUndefined();
+    }
+  });
+});
