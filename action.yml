@@ -40,6 +40,8 @@ inputs:
 outputs:
   image-url:
     description: Presigned URL of the uploaded diagram.
+  image-urls:
+    description: JSON array of all presigned diagram URLs, in stable (lexicographic) order.
   arch-image-url:
     description: Presigned URL of the uploaded architecture diagram (arch/both mode).
 runs:

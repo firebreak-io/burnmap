@@ -10,8 +10,11 @@ import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture } from '@burnma
 import { archToPng } from '@burnmap/graph';
 import { uploadAndPresign } from './s3.js';
 import { upsertStickyComment } from './github.js';
-import { run, type RunDeps } from './run.js';
-import { runArch } from './arch-run.js';
+import { run, renderPlanImage } from './run.js';
+import { runArch, renderArchImage } from './arch-run.js';
+import { commentMarker, buildCommentBody, buildMultiCommentBody, type MultiCommentItem } from './comment.js';
+import { archCommentMarker, buildArchCommentBody, buildArchMultiCommentBody } from './arch-comment.js';
+import { resolvePlans, planSlug } from './plans.js';
 
 async function main(): Promise<void> {
   const planJsonPath = core.getInput('plan-json', { required: true });
@@ -63,63 +66,156 @@ async function main(): Promise<void> {
     : undefined;
   const octokit = getOctokit(token);
 
-  const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
-  const outArchPng = path.join(tmpdir(), `burnmap-${sha}-arch.png`);
+  // Expand plan-json (single path or glob) into a stable, deduped list.
+  const plans = await resolvePlans(planJsonPath);
+  if (plans.length > 25) {
+    core.warning(`burnmap: ${plans.length} plans matched; render time scales linearly.`);
+  }
+  const multi = plans.length > 1;
 
-  // Read+parse the plan once; both render paths reuse this object.
-  const rawPlan = JSON.parse(readFileSync(planJsonPath, 'utf8')) as RawPlan;
-  // Infrastructure adapters shared by the plan and arch render paths.
-  const sharedDeps: Pick<RunDeps, 'readPlanJson' | 'readPng' | 'uploadAndPresign' | 'upsertStickyComment'> = {
-    readPlanJson: () => rawPlan,
-    readPng: (p) => readFileSync(p),
-    uploadAndPresign: (o) => uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
-    upsertStickyComment: (o) => upsertStickyComment({ octokit, ...o }),
-  };
+  const planUrls: string[] = [];
+  const archUrls: string[] = [];
+  const planItems: MultiCommentItem[] = [];
+  const archItems: MultiCommentItem[] = [];
+  const tmpFiles: string[] = [];
 
   try {
-    if (mode === 'plan' || mode === 'both') {
-      const result = await run(
-        { ...sharedDeps, writeShotHtml, cleanupShotHtml, capture: (o) => capture(o) },
-        {
-          planJsonPath, webDist, bucket, ttlSeconds,
-          repo: `${owner}/${repo}`, owner, repoName: repo,
-          prNumber, sha, outPng,
-        },
-      );
-      // The presigned URL is a bearer credential for the image — mask it so it
-      // never appears in (potentially public) Actions logs, including the output.
-      core.setSecret(result.imageUrl);
-      core.setOutput('image-url', result.imageUrl);
-      core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
+    if (!multi) {
+      // Single-plan path: delegate to run()/runArch() exactly as before so the
+      // comment body is byte-identical to the pre-change output.
+      const outPng = path.join(tmpdir(), `burnmap-${sha}.png`);
+      const outArchPng = path.join(tmpdir(), `burnmap-${sha}-arch.png`);
+      tmpFiles.push(outPng, outArchPng);
+
+      // Read+parse the plan once; both render paths reuse this object.
+      const rawPlan = JSON.parse(readFileSync(plans[0]!.path, 'utf8')) as RawPlan;
+      const sharedDeps = {
+        readPlanJson: () => rawPlan,
+        readPng: (p: string) => readFileSync(p),
+        uploadAndPresign: (o: { bucket: string; key: string; body: Buffer; ttlSeconds: number }) =>
+          uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
+        upsertStickyComment: (o: { owner: string; repo: string; prNumber: number; marker: string; body: string }) =>
+          upsertStickyComment({ octokit, ...o }),
+      };
+
+      if (mode === 'plan' || mode === 'both') {
+        const result = await run(
+          { ...sharedDeps, writeShotHtml, cleanupShotHtml, capture: (o) => capture(o) },
+          {
+            planJsonPath: plans[0]!.path, webDist, bucket, ttlSeconds,
+            repo: `${owner}/${repo}`, owner, repoName: repo,
+            prNumber, sha, outPng,
+          },
+        );
+        planUrls.push(result.imageUrl);
+        core.info(`burnmap ${result.commentAction} comment ${result.commentId} (image uploaded)`);
+      }
+
+      if (mode === 'arch' || mode === 'both') {
+        const archResult = await runArch(
+          {
+            ...sharedDeps,
+            archToPng: (plan, meta, out, changes) => archToPng(plan, meta, out, changes ? { changes } : undefined),
+          },
+          {
+            planJsonPath: plans[0]!.path, bucket, ttlSeconds,
+            repo: `${owner}/${repo}`, owner, repoName: repo,
+            prNumber, sha, outPng: outArchPng,
+            // In "both" mode, tint the architecture with the PR's changes.
+            changes: mode === 'both'
+              ? parsePlan(rawPlan, {
+                  repo: `${owner}/${repo}`, prNumber, commitSha: sha,
+                  terraformVersion: rawPlan.terraform_version ?? 'unknown',
+                  generatedAt: new Date().toISOString(),
+                })
+              : undefined,
+          },
+        );
+        archUrls.push(archResult.imageUrl);
+        core.info(`burnmap ${archResult.commentAction} arch comment ${archResult.commentId}`);
+      }
+    } else {
+      // Multi-plan path: render each plan independently, then post one
+      // aggregated comment per render kind.
+      for (const plan of plans) {
+        const slug = planSlug(plan.rel);
+        const suffix = `-${slug}`;
+        const outPng = path.join(tmpdir(), `burnmap-${sha}${suffix}.png`);
+        const outArchPng = path.join(tmpdir(), `burnmap-${sha}${suffix}-arch.png`);
+        tmpFiles.push(outPng, outArchPng);
+
+        const rawPlan = JSON.parse(readFileSync(plan.path, 'utf8')) as RawPlan;
+        const sharedDeps = {
+          readPlanJson: () => rawPlan,
+          readPng: (p: string) => readFileSync(p),
+          uploadAndPresign: (o: { bucket: string; key: string; body: Buffer; ttlSeconds: number }) =>
+            uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
+          upsertStickyComment: (o: { owner: string; repo: string; prNumber: number; marker: string; body: string }) =>
+            upsertStickyComment({ octokit, ...o }),
+        };
+
+        if (mode === 'plan' || mode === 'both') {
+          const r = await renderPlanImage(
+            { ...sharedDeps, writeShotHtml, cleanupShotHtml, capture: (o) => capture(o) },
+            {
+              planJsonPath: plan.path, webDist, bucket, ttlSeconds,
+              repo: `${owner}/${repo}`, owner, repoName: repo, prNumber, sha, outPng, slug,
+            },
+          );
+          planUrls.push(r.imageUrl);
+          planItems.push({ rel: plan.rel, imageUrl: r.imageUrl });
+        }
+
+        if (mode === 'arch' || mode === 'both') {
+          const a = await renderArchImage(
+            {
+              ...sharedDeps,
+              archToPng: (p, m, out, c) => archToPng(p, m, out, c ? { changes: c } : undefined),
+            },
+            {
+              planJsonPath: plan.path, bucket, ttlSeconds,
+              repo: `${owner}/${repo}`, owner, repoName: repo, prNumber, sha, outPng: outArchPng, slug,
+              changes: mode === 'both'
+                ? parsePlan(rawPlan, {
+                    repo: `${owner}/${repo}`, prNumber, commitSha: sha,
+                    terraformVersion: rawPlan.terraform_version ?? 'unknown',
+                    generatedAt: new Date().toISOString(),
+                  })
+                : undefined,
+            },
+          );
+          archUrls.push(a.imageUrl);
+          archItems.push({ rel: plan.rel, imageUrl: a.imageUrl });
+        }
+      }
+
+      // Post one aggregated comment per render kind.
+      if (mode === 'plan' || mode === 'both') {
+        await upsertStickyComment({
+          octokit, owner, repo, prNumber,
+          marker: commentMarker(prNumber),
+          body: buildMultiCommentBody(prNumber, `${owner}/${repo}`, sha, planItems),
+        });
+      }
+      if (mode === 'arch' || mode === 'both') {
+        await upsertStickyComment({
+          octokit, owner, repo, prNumber,
+          marker: archCommentMarker(prNumber),
+          body: buildArchMultiCommentBody(prNumber, `${owner}/${repo}`, sha, archItems),
+        });
+      }
     }
 
-    if (mode === 'arch' || mode === 'both') {
-      const archResult = await runArch(
-        {
-          ...sharedDeps,
-          archToPng: (plan, meta, out, changes) => archToPng(plan, meta, out, changes ? { changes } : undefined),
-        },
-        {
-          planJsonPath, bucket, ttlSeconds,
-          repo: `${owner}/${repo}`, owner, repoName: repo,
-          prNumber, sha, outPng: outArchPng,
-          // In "both" mode, tint the architecture with the PR's changes.
-          changes: mode === 'both'
-            ? parsePlan(rawPlan, {
-                repo: `${owner}/${repo}`, prNumber, commitSha: sha,
-                terraformVersion: rawPlan.terraform_version ?? 'unknown',
-                generatedAt: new Date().toISOString(),
-              })
-            : undefined,
-        },
-      );
-      core.setSecret(archResult.imageUrl);
-      core.setOutput('arch-image-url', archResult.imageUrl);
-      core.info(`burnmap ${archResult.commentAction} arch comment ${archResult.commentId}`);
+    // Outputs: image-url is the first plan URL (or first arch URL in arch mode).
+    const primaryList = mode === 'arch' ? archUrls : planUrls;
+    for (const u of [...planUrls, ...archUrls]) core.setSecret(u);
+    if (primaryList[0]) core.setOutput('image-url', primaryList[0]);
+    core.setOutput('image-urls', JSON.stringify(primaryList));
+    if ((mode === 'both' || mode === 'arch') && archUrls[0]) {
+      core.setOutput('arch-image-url', archUrls[0]);
     }
   } finally {
-    rmSync(outPng, { force: true });
-    rmSync(outArchPng, { force: true });
+    for (const f of tmpFiles) rmSync(f, { force: true });
   }
 }
 
