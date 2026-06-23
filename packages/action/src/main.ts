@@ -28,13 +28,23 @@ async function main(): Promise<void> {
     core.setFailed('url-ttl-seconds must be an integer between 1 and 604800 (S3 presigned-URL max is 7 days)');
     return;
   }
-  const token = core.getInput('github-token', { required: true });
   const webDist = core.getInput('web-dist') || resolveWebDist();
 
   const mode = (core.getInput('mode') || 'plan').toLowerCase();
   if (!['plan', 'arch', 'both'].includes(mode)) {
     core.setFailed(`mode must be one of plan | arch | both (got "${mode}")`);
     return;
+  }
+
+  const wantComment = core.getBooleanInput('comment'); // defaults true via action.yml
+
+  // Token is only needed to post a comment. In upload-only mode it is optional;
+  // warn if supplied but unused.
+  const token = wantComment
+    ? core.getInput('github-token', { required: true })
+    : core.getInput('github-token');
+  if (!wantComment && token) {
+    core.warning('burnmap: github-token is ignored when comment: false.');
   }
 
   // Optional long-lived credentials used ONLY to presign the GET URL. The
@@ -54,9 +64,9 @@ async function main(): Promise<void> {
     core.setSecret(presignSecret);
   }
 
-  const prNumber = context.payload.pull_request?.number;
-  if (!prNumber) {
-    core.setFailed('burnmap must run on a pull_request event (no PR number in context)');
+  const prNumber = context.payload.pull_request?.number ?? 0;
+  if (wantComment && !prNumber) {
+    core.setFailed('burnmap must run on a pull_request event to post a comment (set comment: false for upload-only).');
     return;
   }
   const { owner, repo } = context.repo;
@@ -66,7 +76,7 @@ async function main(): Promise<void> {
   const presignS3 = presignKeyId
     ? new S3Client({ region, credentials: { accessKeyId: presignKeyId, secretAccessKey: presignSecret } })
     : undefined;
-  const octokit = getOctokit(token);
+  const octokit = wantComment ? getOctokit(token) : undefined;
 
   // Expand plan-json (single path or glob) into a stable, deduped list.
   const plans = await resolvePlans(planJsonPath);
@@ -92,13 +102,15 @@ async function main(): Promise<void> {
       tmpFiles.push(outPng, outArchPng);
 
       const rawPlan = JSON.parse(readFileSync(plan.path, 'utf8')) as RawPlan;
+      // renderPlanImage / renderArchImage never call upsertStickyComment; the
+      // stub satisfies the deps interface without requiring octokit here.
+      const neverCalled = (): never => { throw new Error('upsertStickyComment should not be called during render'); };
       const sharedDeps = {
         readPlanJson: () => rawPlan,
         readPng: (p: string) => readFileSync(p),
         uploadAndPresign: (o: { bucket: string; key: string; body: Buffer; ttlSeconds: number }) =>
           uploadAndPresign({ client: s3, presignClient: presignS3, ...o }),
-        upsertStickyComment: (o: { owner: string; repo: string; prNumber: number; marker: string; body: string }) =>
-          upsertStickyComment({ octokit, ...o }),
+        upsertStickyComment: neverCalled,
       };
 
       if (mode === 'plan' || mode === 'both') {
@@ -139,18 +151,20 @@ async function main(): Promise<void> {
     }
 
     // Comments: single-plan keeps byte-identical legacy body; multi posts one
-    // aggregated comment per render kind.
-    if (mode === 'plan' || mode === 'both') {
-      const body = multi
-        ? buildMultiCommentBody(prNumber, `${owner}/${repo}`, sha, planItems)
-        : buildCommentBody(planModels[0]!, planUrls[0]!);
-      await upsertStickyComment({ octokit, owner, repo, prNumber, marker: commentMarker(prNumber), body });
-    }
-    if (mode === 'arch' || mode === 'both') {
-      const body = multi
-        ? buildArchMultiCommentBody(prNumber, `${owner}/${repo}`, sha, archItems)
-        : buildArchCommentBody(archMetas[0]!, archUrls[0]!);
-      await upsertStickyComment({ octokit, owner, repo, prNumber, marker: archCommentMarker(prNumber), body });
+    // aggregated comment per render kind. Skipped entirely in upload-only mode.
+    if (wantComment && octokit) {
+      if (mode === 'plan' || mode === 'both') {
+        const body = multi
+          ? buildMultiCommentBody(prNumber, `${owner}/${repo}`, sha, planItems)
+          : buildCommentBody(planModels[0]!, planUrls[0]!);
+        await upsertStickyComment({ octokit, owner, repo, prNumber, marker: commentMarker(prNumber), body });
+      }
+      if (mode === 'arch' || mode === 'both') {
+        const body = multi
+          ? buildArchMultiCommentBody(prNumber, `${owner}/${repo}`, sha, archItems)
+          : buildArchCommentBody(archMetas[0]!, archUrls[0]!);
+        await upsertStickyComment({ octokit, owner, repo, prNumber, marker: archCommentMarker(prNumber), body });
+      }
     }
 
     // Outputs: image-url is the first plan URL (or first arch URL in arch mode).

@@ -8,8 +8,13 @@ inputs:
     description: S3 bucket for the rendered PNG (private).
     required: true
   github-token:
-    description: Token used to post the PR comment.
+    description: Token used to post the PR comment (unused when comment: false).
+    required: false
     default: ${{ github.token }}
+  comment:
+    description: "Post a sticky PR comment with the diagram(s). Set false for upload-only (no PR/token needed)."
+    required: false
+    default: "true"
   aws-region:
     description: AWS region for the S3 client.
     required: false
