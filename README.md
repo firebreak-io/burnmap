@@ -116,7 +116,7 @@ Set `mode` to render an architecture diagram of the stack instead of (or alongsi
 - `arch` renders a clustered diagram of the stack's resources and their references, derived from the plan's `configuration` section. It posts as a separate sticky comment; the URL is exposed as the `arch-image-url` output.
 - `both` renders both, and tints changed resources on the architecture.
 
-In `arch` (and `both`) mode, `image-urls` contains the architecture diagram URLs. In a multi-plan `both` run, only the first architecture URL is exposed via `arch-image-url` — the rest are embedded in the architecture comment.
+`image-url`/`image-urls` hold the plan diagram URLs (the architecture URLs only in pure `arch` mode, which renders no plan diagram). In `arch` and `both` mode the architecture diagram URL is exposed via `arch-image-url`; in a multi-plan `both` run only the first architecture URL is surfaced there — the rest are embedded in the architecture comment.
 
 Phase 1 scope: resources within one stack, with edges resolved inside a module scope (cross-module edges and data sources are not drawn yet). Generate diagrams locally with the CLI:
 

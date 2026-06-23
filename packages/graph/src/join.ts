@@ -8,7 +8,11 @@ const RANK: Record<Action, number> = {
 
 /** Strip a trailing `[index]` / `["key"]` from a resource address. */
 function configAddress(address: string): string {
-  return address.replace(/\[[^\]]*\]$/, '');
+  // Linear scan instead of a regex: `/\[[^\]]*\]$/` is flagged by CodeQL as a
+  // polynomial-time pattern that can backtrack on inputs like `[[[[…`.
+  if (!address.endsWith(']')) return address;
+  const i = address.lastIndexOf('[');
+  return i === -1 ? address : address.slice(0, i);
 }
 
 /** Set `node.action` from the ChangeModel, joining by config address. */

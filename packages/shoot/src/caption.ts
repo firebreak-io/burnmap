@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { capture } from './capture.js';
 
+let counter = 0;
+
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -28,7 +30,9 @@ export async function captionPng(png: Buffer, caption: string, outPath: string):
     else img.onload = () => { window.__BURNMAP_READY__ = true; };
   </script></body></html>`;
 
-  const htmlPath = path.join(tmpdir(), `burnmap-caption-${process.pid}-${outPath.length}.html`);
+  // Unique per call (process.pid + monotonic counter) so concurrent captionPng
+  // calls can't clobber each other's temp HTML mid-render.
+  const htmlPath = path.join(tmpdir(), `burnmap-caption-${process.pid}-${counter++}.html`);
   writeFileSync(htmlPath, html, 'utf8');
   try {
     await capture({ shotHtmlPath: htmlPath, outPath, selector: '.captioned' });

@@ -5,7 +5,6 @@ import * as core from '@actions/core';
 import { context, getOctokit } from '@actions/github';
 import { S3Client } from '@aws-sdk/client-s3';
 import type { RawPlan } from '@burnmap/parser';
-import { parsePlan } from '@burnmap/parser';
 import { resolveWebDist, writeShotHtml, cleanupShotHtml, capture, captionPng } from '@burnmap/shoot';
 import { archToPng } from '@burnmap/graph';
 import type { ArchMeta } from '@burnmap/graph';
@@ -149,6 +148,11 @@ async function main(): Promise<void> {
         upsertStickyComment: neverCalled,
       };
 
+      // In "both" mode the plan branch runs first and parses the plan into a
+      // ChangeModel; reuse it for the arch tint instead of re-parsing (avoids
+      // double work and a second, skewed generatedAt timestamp).
+      let planModel: ChangeModel | undefined;
+
       if (mode === 'plan' || mode === 'both') {
         const r = await renderPlanImage(
           { ...sharedDeps, writeShotHtml, cleanupShotHtml, capture: (o) => capture(o) },
@@ -157,6 +161,7 @@ async function main(): Promise<void> {
             repo: `${owner}/${repo}`, owner, repoName: repo, prNumber, sha, outPng, slug,
           },
         );
+        planModel = r.model;
         planUrls.push(r.imageUrl);
         planModels.push(r.model);
         planItems.push({ rel: plan.rel, imageUrl: r.imageUrl, caption });
@@ -171,13 +176,7 @@ async function main(): Promise<void> {
           {
             planJsonPath: plan.path, bucket, ttlSeconds,
             repo: `${owner}/${repo}`, owner, repoName: repo, prNumber, sha, outPng: outArchPng, slug,
-            changes: mode === 'both'
-              ? parsePlan(rawPlan, {
-                  repo: `${owner}/${repo}`, prNumber, commitSha: sha,
-                  terraformVersion: rawPlan.terraform_version ?? 'unknown',
-                  generatedAt: new Date().toISOString(),
-                })
-              : undefined,
+            changes: mode === 'both' ? planModel : undefined,
           },
         );
         archUrls.push(a.imageUrl);
