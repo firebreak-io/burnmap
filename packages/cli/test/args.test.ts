@@ -34,6 +34,21 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['parse', 'p.json', '-x'])).toThrowError(CliError);
     try { parseArgs(['parse', 'p.json', '-x']); } catch (e) { expect((e as CliError).code).toBe(2); }
   });
+
+  it('throws CliError(2) when --out has no value (end of argv)', () => {
+    expect(() => parseArgs(['arch', 'p.json', '--out'])).toThrowError(CliError);
+    try { parseArgs(['arch', 'p.json', '--out']); } catch (e) { expect((e as CliError).code).toBe(2); }
+  });
+
+  it('throws CliError(2) when --out value looks like another flag', () => {
+    expect(() => parseArgs(['arch', 'p.json', '--out', '--help'])).toThrowError(CliError);
+    try { parseArgs(['arch', 'p.json', '--out', '--help']); } catch (e) { expect((e as CliError).code).toBe(2); }
+  });
+
+  it('throws CliError(2) when --out-dir has no value', () => {
+    expect(() => parseArgs(['render', 'p.json', '--out-dir'])).toThrowError(CliError);
+    try { parseArgs(['render', 'p.json', '--out-dir']); } catch (e) { expect((e as CliError).code).toBe(2); }
+  });
 });
 
 describe('outKind', () => {

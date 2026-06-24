@@ -17,11 +17,20 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = { help: false, version: false };
   const positionals: string[] = [];
+  // Pull the value for a value-taking flag, rejecting a missing or flag-like
+  // next token (so `--out --help` errors instead of treating `--help` as a path).
+  const takeValue = (i: number, flag: string): string => {
+    const value = argv[i + 1];
+    if (value === undefined || value.startsWith('-')) {
+      throw new CliError(`${flag} requires a value`, 2);
+    }
+    return value;
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]!;
     switch (arg) {
-      case '--out': out.out = argv[++i]; break;
-      case '--out-dir': out.outDir = argv[++i]; break;
+      case '--out': out.out = takeValue(i, '--out'); i += 1; break;
+      case '--out-dir': out.outDir = takeValue(i, '--out-dir'); i += 1; break;
       case '-h': case '--help': out.help = true; break;
       case '-v': case '--version': out.version = true; break;
       default:
