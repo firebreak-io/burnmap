@@ -6,6 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": { "burnmap-shoot": "dist/cli.js" },
+  "files": ["dist"],
+  "repository": { "type": "git", "url": "https://github.com/firebreak-io/burnmap.git", "directory": "packages/shoot" },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
